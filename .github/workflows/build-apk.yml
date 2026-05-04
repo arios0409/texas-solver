@@ -1,0 +1,70 @@
+name: 编译 APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: 设置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 复制网页到 Android assets
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp index.html android/app/src/main/assets/
+          cp manifest.json android/app/src/main/assets/ 2>/dev/null || true
+          cp sw.js android/app/src/main/assets/ 2>/dev/null || true
+
+      - name: 授权 Gradle 执行
+        run: chmod +x android/gradlew 2>/dev/null || true
+
+      - name: 用 Gradle 构建 APK
+        working-directory: ./android
+        run: |
+          # 如果没有gradlew, 用gradle命令
+          if [ ! -f gradlew ]; then
+            gradle assembleRelease --no-daemon
+          else
+            ./gradlew assembleRelease --no-daemon
+          fi
+
+      - name: 签名 APK
+        run: |
+          # 生成调试签名密钥
+          keytool -genkey -v -keystore release.keystore -alias pktrainer \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=翻前训练器, OU=PK, O=Trainer, L=City, S=State, C=CN"
+          # 签名
+          jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
+            -keystore release.keystore -storepass android \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk pktrainer
+          # 对齐
+          zipalign -v -p 4 \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            翻前训练器yifan-v1.0.apk
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: 翻前训练器yifan-APK
+          path: 翻前训练器yifan-v1.0.apk
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: 翻前训练器yifan-v*.apk

@@ -1,0 +1,5 @@
+node_modules/
+build/
+*.apk
+*.keystore
+.DS_Store

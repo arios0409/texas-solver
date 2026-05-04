@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>翻前训练器yifan</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#1a1a2e;--card:#16213e;--green:#00c853;--red:#ff1744;--yellow:#ffd600;--blue:#2979ff;--text:#e0e0e0;--sub:#888;--border:#2a2a4e;--gold:#ffab00}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:-apple-system,'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100%
+}
+.header{
+  background:linear-gradient(135deg,#1a1a3e 0%,#16213e 100%);
+  border-bottom:1px solid var(--border);padding:12px 16px;display:flex;
+  justify-content:space-between;align-items:center;flex-shrink:0
+}
+.header h1{font-size:18px;font-weight:700;color:var(--gold)}
+.header .sub{font-size:12px;color:var(--sub)}
+.scenario-bar{
+  background:#0f1a2e;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0
+}
+.scenario-text{font-size:14px;line-height:1.5;color:#ccc}
+.scenario-text strong{color:var(--gold)}
+.scenario-text .hand-card{
+  display:inline-block;background:#1a1a1a;border:1px solid #444;border-radius:4px;
+  padding:1px 6px;font-size:13px;font-weight:700;margin:0 2px;font-family:monospace
+}
+.scenario-type-badge{
+  display:inline-block;font-size:11px;border-radius:4px;padding:2px 8px;
+  font-weight:700;margin-bottom:6px
+}
+.scenario-type-badge.rfi{background:var(--green);color:#1a1a1a}
+.scenario-type-badge.facing-raise{background:var(--blue);color:#fff}
+.scenario-type-badge.facing-3bet{background:var(--red);color:#fff}
+
+.cards-area{
+  display:flex;justify-content:center;align-items:center;padding:12px 16px 8px;flex-shrink:0
+}
+.card-display{
+  display:flex;gap:8px;align-items:center
+}
+.card-single{
+  width:64px;height:92px;border-radius:8px;background:linear-gradient(145deg,#fff,#f0f0f0);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,.4);
+  position:relative
+}
+.card-single .rank{font-size:24px;line-height:1}
+.card-single .suit{font-size:20px;line-height:1;margin-top:3px}
+.card-single.red{color:#d32f2f}
+.card-single.black{color:#222}
+.card-single .card-label{
+  position:absolute;top:3px;left:5px;font-size:10px;line-height:1.1;font-weight:700
+}
+.card-single .card-label-br{
+  position:absolute;bottom:3px;right:5px;font-size:10px;line-height:1.1;font-weight:700;transform:rotate(180deg)
+}
+.card-single.red .card-label,.card-single.red .card-label-br{color:#d32f2f}
+.card-single.black .card-label,.card-single.black .card-label-br{color:#222}
+
+.action-area{
+  flex:1;overflow-y:auto;padding:8px 16px 90px;display:flex;flex-direction:column;gap:8px
+}
+.action-group{background:var(--card);border-radius:12px;padding:12px 14px;border:1px solid var(--border)}
+.action-group label{font-size:13px;color:var(--sub);display:block;margin-bottom:6px}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap}
+.btn{
+  flex:1;min-width:70px;padding:10px 0;border:none;border-radius:8px;
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .12s;color:#fff
+}
+.btn:active{transform:scale(.95)}
+.btn-fold{background:var(--red)}
+.btn-fold.active{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--red)}
+.btn-call{background:var(--blue)}
+.btn-call.active{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--blue)}
+.btn-raise{background:var(--green)}
+.btn-raise.active{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--green)}
+.btn-check{background:#78909c}
+.btn-check.active{box-shadow:0 0 0 2px #fff,0 0 0 4px #78909c}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:disabled:active{transform:none}
+
+.raise-size-row{display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap}
+.raise-size-input{
+  flex:1;min-width:70px;background:#0f1a2e;border:1px solid var(--border);border-radius:6px;
+  color:#fff;padding:6px 10px;font-size:15px;font-weight:700;width:70px
+}
+.raise-size-input:focus{outline:none;border-color:var(--green)}
+.raise-btn{
+  padding:6px 10px;border:1px solid var(--border);border-radius:6px;
+  background:transparent;color:var(--text);font-size:12px;cursor:pointer;transition:all .12s
+}
+.raise-btn:active{background:var(--green);color:#fff;border-color:var(--green)}
+.raise-btn.sel{background:var(--green);color:#fff;border-color:var(--green)}
+
+.submit-row{display:flex;gap:6px;margin-top:6px}
+.btn-submit{
+  flex:1;padding:12px 0;border:none;border-radius:10px;
+  background:linear-gradient(135deg,var(--green),#00e676);
+  color:#1a1a1a;font-size:14px;font-weight:700;cursor:pointer;transition:all .12s
+}
+.btn-submit:active{transform:scale(.97)}
+.btn-submit:disabled{opacity:.4;cursor:not-allowed}
+.btn-submit:disabled:active{transform:none}
+.btn-next{
+  flex:1;padding:12px 0;border:1px solid var(--border);border-radius:10px;
+  background:transparent;color:var(--text);font-size:14px;font-weight:700;cursor:pointer;transition:all .12s
+}
+.btn-next:active{background:var(--border)}
+
+.result-area{display:none;margin-top:6px}
+.result-area.show{display:block}
+.result-box{
+  background:var(--card);border-radius:10px;padding:14px;border:1px solid var(--border);margin-bottom:8px
+}
+.result-title{
+  font-size:15px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px
+}
+.result-title .icon{font-size:18px}
+.result-title.correct{color:var(--green)}
+.result-title.wrong{color:var(--red)}
+.result-title.partial{color:var(--yellow)}
+.result-detail{font-size:12px;line-height:1.6;color:#bbb}
+.result-detail hr{border:none;border-top:1px solid var(--border);margin:6px 0}
+.result-detail ul{margin:4px 0;padding-left:16px}
+.result-detail li{margin-bottom:3px}
+
+.range-grid-wrap{
+  background:var(--card);border-radius:10px;padding:10px;border:1px solid var(--border);overflow-x:auto
+}
+.range-grid-wrap h3{font-size:12px;color:var(--sub);margin-bottom:6px;text-align:center}
+.range-grid{
+  display:grid;grid-template-columns:repeat(13,1fr);gap:1px;
+  min-width:270px;max-width:340px;margin:0 auto
+}
+.range-cell{
+  aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  font-size:8px;font-weight:600;border-radius:1px;cursor:default;
+  font-family:monospace;transition:all .1s
+}
+.range-cell.in-range{background:var(--green);color:#1a1a1a;opacity:.8}
+.range-cell.in-range.current{background:var(--gold);color:#1a1a1a;opacity:1;box-shadow:inset 0 0 0 2px #fff}
+.range-cell.in-range.rec-call{background:var(--blue);color:#fff;opacity:.75}
+.range-cell.in-range.rec-call.current{background:var(--gold);color:#1a1a1a;opacity:1;box-shadow:inset 0 0 0 2px #fff}
+.range-cell.in-range.rec-raise{background:var(--green);color:#1a1a1a;opacity:.75}
+.range-cell.in-range.rec-raise.current{background:var(--gold);color:#1a1a1a;opacity:1;box-shadow:inset 0 0 0 2px #fff}
+.range-cell.in-range.rec-mix{background:linear-gradient(135deg,var(--blue) 50%,var(--green) 50%);color:#fff;opacity:.8}
+.range-cell.in-range.rec-mix.current{box-shadow:inset 0 0 0 2px #fff}
+.range-cell.not-in-range{background:#1a1a1a;color:#444}
+.range-cell .cell-label{font-size:7px;line-height:1;white-space:nowrap}
+.range-cell.not-in-range .cell-label{display:none}
+
+.range-legend{display:flex;gap:8px;justify-content:center;margin-top:4px;flex-wrap:wrap}
+.range-legend-item{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--sub)}
+.range-legend-item .swatch{width:12px;height:12px;border-radius:2px}
+.range-legend-item .swatch.green{background:var(--green);opacity:.8}
+.range-legend-item .swatch.blue{background:var(--blue);opacity:.75}
+.range-legend-item .swatch.gold{background:var(--gold)}
+.range-legend-item .swatch.mix{background:linear-gradient(135deg,var(--blue) 50%,var(--green) 50%)}
+
+.stats-bar{
+  display:flex;gap:10px;padding:2px 0;font-size:11px;color:var(--sub);flex-wrap:wrap
+}
+.stats-bar span strong{color:var(--text);margin-right:2px}
+
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:linear-gradient(180deg,rgba(26,26,46,0) 0%,rgba(26,26,46,.95) 30%);
+  padding:10px 16px 14px;display:flex;gap:8px;flex-shrink:0;pointer-events:none
+}
+.bottom-nav>*{pointer-events:auto}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>♠ 翻前训练器yifan</h1>
+    <div class="sub">6人桌 GTO 翻前训练</div>
+  </div>
+  <div class="stats-bar" id="statsBar">
+    <span>题 <strong id="totalQ">0</strong></span>
+    <span>✓ <strong id="correctQ" style="color:var(--green)">0</strong></span>
+    <span>✗ <strong id="wrongQ" style="color:var(--red)">0</strong></span>
+  </div>
+</div>
+
+<div class="scenario-bar" id="scenarioBar">
+  <div id="scenarioBadge"></div>
+  <div class="scenario-text" id="scenarioText">点击底部「♠ 发牌」开始训练</div>
+</div>
+
+<div class="cards-area">
+  <div class="card-display" id="cardDisplay">
+    <div class="card-single" id="card1">
+      <div class="card-label" id="c1label"></div>
+      <div class="rank" id="c1rank">A</div>
+      <div class="suit" id="c1suit">♠</div>
+      <div class="card-label-br" id="c1labelBr"></div>
+    </div>
+    <div class="card-single" id="card2">
+      <div class="card-label" id="c2label"></div>
+      <div class="rank" id="c2rank">K</div>
+      <div class="suit" id="c2suit">♠</div>
+      <div class="card-label-br" id="c2labelBr"></div>
+    </div>
+  </div>
+</div>
+
+<div class="action-area" id="actionArea">
+  <div class="action-group">
+    <label>你的行动</label>
+    <div class="btn-row" id="actionBtns">
+      <button class="btn btn-fold" data-action="fold">弃牌</button>
+      <button class="btn btn-check" data-action="check" id="checkBtn">过牌</button>
+      <button class="btn btn-call" data-action="call" id="callBtn">跟注</button>
+      <button class="btn btn-raise" data-action="raise">加注</button>
+    </div>
+    <div class="raise-size-row" id="raiseSizeRow" style="display:none">
+      <input type="number" class="raise-size-input" id="raiseSize" value="3" min="2" step="0.5">
+      <button class="raise-btn" data-size="2.5">2.5</button>
+      <button class="raise-btn sel" data-size="3">3</button>
+      <button class="raise-btn" data-size="3.5">3.5</button>
+      <button class="raise-btn" data-size="4">4</button>
+      <button class="raise-btn" data-size="10">10</button>
+      <button class="raise-btn" data-size="12">12</button>
+    </div>
+    <div class="submit-row">
+      <button class="btn-submit" id="submitBtn" disabled>提交答案</button>
+      <button class="btn-next" id="nextBtn">下一题 →</button>
+    </div>
+  </div>
+
+  <div class="result-area" id="resultArea">
+    <div class="result-box" id="resultBox">
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-detail" id="resultDetail"></div>
+    </div>
+    <div class="range-grid-wrap" id="rangeGridWrap" style="display:none">
+      <h3 id="rangeGridTitle">GTO推荐范围</h3>
+      <div class="range-grid" id="rangeGrid"></div>
+      <div class="range-legend">
+        <div class="range-legend-item"><div class="swatch green"></div> 加注</div>
+        <div class="range-legend-item"><div class="swatch blue"></div> 跟注</div>
+        <div class="range-legend-item"><div class="swatch mix"></div> 混合</div>
+        <div class="range-legend-item"><div class="swatch gold"></div> 当前手牌</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-nav">
+  <button class="btn btn-raise" id="newHandBtn" style="flex:1;padding:12px;border-radius:10px;font-size:15px;font-weight:700;border:none;cursor:pointer;background:var(--gold);color:#1a1a1a">♠ 发牌</button>
+</div>
+
+<script>
+// ============================================================
+// 核心数据 - 6人桌 GTO 翻前范围 (100bb 标准现金局)
+// ============================================================
+const RANKS = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+const RANK_IDX = {A:0,K:1,Q:2,J:3,T:4,9:5,8:6,7:7,6:8,5:9,4:10,3:11,2:12};
+const POS_NAMES = ['UTG','HJ','CO','BTN','SB','BB'];
+const POS_FULL = {UTG:'UTG (枪口)',HJ:'HJ (劫持位)',CO:'CO (关煞位)',BTN:'BTN (按钮)',SB:'SB (小盲)',BB:'BB (大盲)'};
+
+// ---- 手牌工具 ----
+function parseHand(str){
+  str=str.trim().toUpperCase();
+  if(str.length===2) return {r1:str[0],r2:str[1],suited:false};
+  if(str.endsWith('S')) return {r1:str[0],r2:str[1],suited:true};
+  if(str.endsWith('O')) return {r1:str[0],r2:str[1],suited:false};
+  return null;
+}
+function handToStr(h){
+  if(!h) return '';
+  if(h.r1===h.r2) return h.r1+h.r2;
+  return h.r1+h.r2+(h.suited?'s':'o');
+}
+function handToDisplay(h){
+  let s=handToStr(h);
+  return s.replace(/s$/,'♠').replace(/o$/,'♢');
+}
+function handEq(a,b){return a.r1===b.r1&&a.r2===b.r2&&a.suited===b.suited}
+
+// ---- 范围解析器: "77+, ATs+, AQo+" ----
+function expandRangeStr(str){
+  if(!str||!str.trim()) return [];
+  let parts=str.split(',').map(s=>s.trim()).filter(Boolean);
+  let result=[];
+  for(let p of parts){
+    if(p.includes('+')){let base=p.replace('+','').trim();let h=parseHand(base);if(!h) continue;let i1=RANK_IDX[h.r1],i2=RANK_IDX[h.r2];if(h.r1===h.r2){for(let i=i1;i>=0;i--) result.push(RANKS[i]+RANKS[i]);}else if(h.suited){for(let i=i2;i>0;i--){if(i>=i1) continue;result.push(RANKS[i1]+RANKS[i]+'s');}}else{for(let i=i2;i>0;i--){if(i>=i1) continue;result.push(RANKS[i1]+RANKS[i]+'o');}}}else{let h=parseHand(p);if(h) result.push(handToStr(h));}
+  }
+  return [...new Set(result)];
+}
+function rangeToSet(arr){let s=new Set();for(let a of arr) s.add(a.toUpperCase());return s;}
+
+// ==== 更准确的 GTO 范围（参考主流解算器 6-max 100bb）====
+// RFI 范围 - 大幅补全
+const RFI_RANGES = {
+  UTG: expandRangeStr('66+, ATs+, A5s, KJs+, QTs+, JTs, T9s, 98s, 87s, AQo+, KQo'),
+  HJ:  expandRangeStr('55+, A8s+, A5s-A2s, K8s+, Q9s+, J9s+, T7s+, 97s+, 87s, 76s, 65s, ATo+, KJo+, QJo'),
+  CO:  expandRangeStr('22+, A2s+, K6s+, Q9s+, J8s+, T7s+, 96s+, 86s+, 76s, 65s, 54s, A7o+, K9o+, Q9o+, J9o+, T9o'),
+  BTN: expandRangeStr('22+, A2s+, K2s+, Q2s+, J5s+, T6s+, 96s+, 85s+, 74s+, 63s+, 53s+, 43s, A2o+, K6o+, Q8o+, J8o+, T8o+, 97o+, 87o'),
+  SB:  expandRangeStr('22+, A2s+, K2s+, Q4s+, J7s+, T7s+, 96s+, 86s+, 75s+, 65s, 54s, 43s, A2o+, K7o+, Q9o+, J9o+, T9o, 98o'),
+  BB:  []
+};
+
+// 位置翻前加注率（近似）
+const RFI_PCT = {UTG:15,HJ:21,CO:29,BTN:43,SB:37};
+
+// === 面对加注防守范围（更完整） ===
+const VS_RAISE = {
+  UTG: {call:expandRangeStr('JJ-99, AQs-AJs, ATs, KQs, QJs, JTs, T9s'), raise:expandRangeStr('KK+, AKs, AKo, A5s')},
+  HJ:  {call:expandRangeStr('TT-88, AJs-ATs, A5s-A4s, KQs, KJs, QJs, JTs, T9s, 98s, AQo'), raise:expandRangeStr('QQ+, AKs, AKo, A5s, A4s')},
+  CO:  {call:expandRangeStr('TT-77, AJs-A9s, A5s-A4s, KJs-KTs, QJs, JTs, T9s, 98s, 87s, AQo'), raise:expandRangeStr('JJ+, AKs, AKo, A5s, KJs, KTs')},
+  BTN: {call:expandRangeStr('99-55, ATs-A7s, A5s-A4s, KJs-KTs, QJs-QTs, JTs, T9s, 98s, 87s, 76s, AJo'), raise:expandRangeStr('TT+, AJs+, AQo+, KQs, KJs, A5s, A4s, KTs')},
+  SB:  {call:expandRangeStr('88-55, ATs-A5s, A3s-A2s, KTs-K9s, QJs-QTs, JTs, T9s, 98s, 87s, AJo, KJo'), raise:expandRangeStr('99+, AJs+, AQo+, KQs, KJs, A5s, A4s, KTs')}
+};
+
+// === 面对3bet防守范围（更完整） ===
+const VS_3BET = {
+  UTG: {call:expandRangeStr('JJ-TT, AQs-AJs, ATs, KQs, KJs, QJs, AKo'), raise:expandRangeStr('KK+, AKs, A5s')},
+  HJ:  {call:expandRangeStr('JJ-99, AQs-ATs, KQs, KJs, QJs, JTs, AKo'), raise:expandRangeStr('KK+, AKs, A5s, A4s')},
+  CO:  {call:expandRangeStr('TT-77, AJs-ATs, A5s, KQs, KJs, QJs, JTs, T9s, 98s, AQo, AKo'), raise:expandRangeStr('JJ+, AKs, A5s, A4s, KQs')},
+  BTN: {call:expandRangeStr('99-77, ATs-A9s, A5s, KJs-KTs, QJs, JTs, T9s, 98s, 87s, AJo, AQo, AKo'), raise:expandRangeStr('TT+, AJs+, AQo+, AKo, A5s, KQs, KJs')},
+  SB:  {call:expandRangeStr('99-77, ATs-A8s, A5s, KJs, QJs, JTs, T9s, 98s, AJo, AQo, AKo'), raise:expandRangeStr('TT+, AJs+, AQo+, AKo, A5s, A4s, KQs')}
+};
+
+// ---- 范围渲染 ----
+function renderRangeGrid(containerId, titleId, title, callSet, raiseSet, currentHandStr){
+  let grid=document.getElementById(containerId);
+  let titleEl=document.getElementById(titleId);
+  if(!grid) return;
+  titleEl.textContent=title;
+  grid.innerHTML='';
+  for(let i=0;i<13;i++){
+    for(let j=0;j<13;j++){
+      let cell=document.createElement('div');
+      let key;
+      if(i===j) key=RANKS[i]+RANKS[i];
+      else if(i<j) key=RANKS[i]+RANKS[j]+'s';
+      else key=RANKS[i]+RANKS[j]+'o';
+      let label=key.replace(/s$/,'').replace(/o$/,'');
+      let inCall=callSet&&callSet.has(key);
+      let inRaise=raiseSet&&raiseSet.has(key);
+      let isCurrent=currentHandStr&&key===currentHandStr;
+      cell.className='range-cell not-in-range';
+      if(inCall&&inRaise) cell.className='range-cell in-range rec-mix';
+      else if(inRaise) cell.className='range-cell in-range rec-raise';
+      else if(inCall) cell.className='range-cell in-range rec-call';
+      if(isCurrent) cell.className+=' current';
+      cell.innerHTML=`<span class="cell-label">${label}</span>`;
+      grid.appendChild(cell);
+    }
+  }
+}
+
+// ---- 权益估算 & EV 分析 ----
+// 简化权益估值（基于常见对局数据）
+function estimateEquity(hand, pos){
+  let h=hand, i1=RANK_IDX[h.r1], i2=RANK_IDX[h.r2];
+  let isP=h.r1===h.r2, isS=h.suited;
+  let high=Math.max(i1,i2), low=Math.min(i1,i2);
+  let gap=high-low;
+  // 基础分值 (0-100)
+  let score=0;
+  if(isP){ // 对子
+    score=70-(high*4); // AA=70, KK=66, ...
+  }else if(isS){ // 同花
+    score=65-(high*3)-(gap*2);
+    if(gap<=2) score+=5;  // 连接牌加成
+    if(low<=5) score+=3;  // 低张同花连牌
+  }else{ // 非同花
+    score=55-(high*3)-(gap*2);
+    if(gap<=1) score+=3;
+  }
+  // 位置加成
+  let posBonus={UTG:-5,HJ:-2,CO:0,BTN:3,SB:-3,BB:-2};
+  score+=(posBonus[pos]||0);
+  return Math.max(10,Math.min(95,score));
+}
+
+function potOdds(callAmt, potBeforeCall){
+  if(callAmt<=0) return 0;
+  return callAmt/(potBeforeCall+callAmt)*100;
+}
+
+// 翻后权益实现率（位置因素）
+function realizationFactor(pos, raiserPos){
+  let base={UTG:0.75,HJ:0.80,CO:0.85,BTN:0.95,SB:0.65,BB:0.70};
+  let f=base[pos]||0.8;
+  if(raiserPos){
+    let ipBonus={UTG:0.10,HJ:0.08,CO:0.05,BTN:0,SB:-0.08,BB:-0.10};
+    f+=(ipBonus[pos]||0)-(ipBonus[raiserPos]||0);
+  }
+  return Math.max(0.5,Math.min(1.0,f));
+}
+
+function buildEVAnalysis(sc, act, equity){
+  let lines=[];
+  let pos=sc.pos;
+
+  if(sc.type==='rfi'){
+    // RFI EV计算
+    let raiseSize=sc.defaultSize||3;
+    let pot=1.5; // 盲注
+    // EV= 弃牌率*底池 + (1-弃牌率)*[权益*(底池+加注额) - 加注额]
+    // 简化: 假设盲注防守率约50-60%
+    let defenseRate={UTG:0.45,HJ:0.50,CO:0.55,BTN:0.60,SB:0.55};
+    let dr=defenseRate[pos]||0.5;
+    let fe=1-dr; // 弃牌率
+    let evFold=0;
+    let evRaise=fe*pot + (1-fe)*(equity/100*(pot+2*raiseSize)-raiseSize);
+
+    if(act.action==='raise'){
+      lines.push(`📈 <strong>EV分析（加注${raiseSize}bb）：</strong>`);
+      lines.push(`弃牌EV = 0bb（基准线）`);
+      lines.push(`估算盲注防守率 = ${(dr*100).toFixed(0)}% → 弃牌率 = ${(fe*100).toFixed(0)}%`);
+      lines.push(`加注EV ≈ ${evRaise.toFixed(2)}bb （含弃牌收益 + 权益实现）`);
+      if(evRaise>0) lines.push(`→ EV > 0，加注是 +EV 行动 ✅`);
+      else lines.push(`→ EV < 0，加注是 -EV 行动 ❌`);
+    }else{
+      lines.push(`📈 <strong>EV分析（弃牌）：</strong>`);
+      lines.push(`弃牌EV = 0bb（基准线）`);
+      if(equity>40) lines.push(`你的手牌约有 ${equity}% 的底池权益，若加注${raiseSize}bb的EV ≈ ${evRaise.toFixed(1)}bb`);
+      else lines.push(`你的手牌权益约 ${equity}%，在该位置难以实现正EV。`);
+    }
+    lines.push(`权益实现率 ≈ ${(realizationFactor(pos)*100).toFixed(0)}%（位置因素）`);
+
+  }else if(sc.type==='facing_raise'){
+    let callAmt=sc.size||2.5;
+    let potBefore=1.5+callAmt; // 盲注+加注
+    let po=potOdds(callAmt, potBefore);
+    let reqEquity=po/realizationFactor(pos, sc.raiser);
+    let threeSize=sc.defaultSize||10;
+
+    if(act.action==='fold'){
+      lines.push(`📈 <strong>EV分析（弃牌）：</strong>`);
+      lines.push(`弃牌EV = 0bb（基准线）`);
+      lines.push(`底池赔率 = ${po.toFixed(1)}%（跟注${callAmt}bb赢${potBefore+callAmt}bb）`);
+      lines.push(`你需要实现约 ${reqEquity.toFixed(1)}% 的权益才能保本`);
+      lines.push(`你的手牌权益约 ${equity}%，${equity>=reqEquity?'足以跟注 → 弃牌可能损失EV ❌':'不足以跟注 → 弃牌正确 ✅'}`);
+    }else if(act.action==='call'){
+      lines.push(`📈 <strong>EV分析（跟注${callAmt}bb）：</strong>`);
+      lines.push(`底池赔率 = ${po.toFixed(1)}%`);
+      lines.push(`需要权益 ≈ ${reqEquity.toFixed(1)}%（含位置调整）`);
+      lines.push(`你的手牌权益约 ${equity}%，${equity>=reqEquity?'满足要求 ✅':'不足，跟注可能是 -EV ⚠️'}`);
+      lines.push(`翻后权益实现率 ≈ ${(realizationFactor(pos,sc.raiser)*100).toFixed(0)}%`);
+    }else if(act.action==='raise'){
+      let dr={UTG:0.55,HJ:0.55,CO:0.50,BTN:0.45,SB:0.45};
+      let defense=dr[pos]||0.5;
+      let fe3=1-defense;
+      let pot3=1.5+callAmt;
+      let ev3bet=fe3*pot3+(1-fe3)*(equity/100*(pot3+2*threeSize)-threeSize);
+      lines.push(`📈 <strong>EV分析（3bet到${threeSize}bb）：</strong>`);
+      lines.push(`估算对手防守率 = ${(defense*100).toFixed(0)}% → 弃牌率 = ${(fe3*100).toFixed(0)}%`);
+      lines.push(`3bet EV ≈ ${ev3bet.toFixed(2)}bb`);
+      if(ev3bet>0) lines.push(`→ +EV，3bet有价值 ✅`);
+      else lines.push(`→ 纯诈唬EV偏低，考虑手牌范围是否合适 ⚠️`);
+    }
+  }else if(sc.type==='facing_3bet'){
+    let ourSize=sc.size||2.5;
+    let threeSize=sc.threeSize||9;
+    let callAmt=threeSize-ourSize;
+    let potBefore=1.5+ourSize+threeSize;
+    let po=potOdds(callAmt, potBefore);
+
+    if(act.action==='fold'){
+      lines.push(`📈 <strong>EV分析（弃牌）：</strong>`);
+      lines.push(`弃牌EV = 0bb（基准线）`);
+      lines.push(`跟注需要 ${po.toFixed(1)}% 的底池权益`);
+      lines.push(`你的手牌权益约 ${equity}%，${equity>=po?'可能偏紧 ❌':'弃牌合理 ✅'}`);
+    }else if(act.action==='call'){
+      lines.push(`📈 <strong>EV分析（跟注${callAmt}bb）：</strong>`);
+      lines.push(`底池赔率 = ${po.toFixed(1)}%`);
+      lines.push(`你需要翻后实现约 ${(po/0.85).toFixed(1)}% 的权益（考虑OOP因素）`);
+      lines.push(`你的手牌权益约 ${equity}%，${equity>po?'值得跟注 ✅':'跟注可能 -EV ⚠️'}`);
+    }else if(act.action==='raise'){
+      let fourSize=act.size||(threeSize+8);
+      let dr4={UTG:0.55,HJ:0.55,CO:0.50,BTN:0.45,SB:0.45};
+      let d4=dr4[sc.raiser]||0.5;
+      let fe4=1-d4;
+      let pot4=1.5+ourSize+threeSize;
+      let ev4bet=fe4*pot4+(1-fe4)*(equity/100*(pot4+2*fourSize)-fourSize);
+      lines.push(`📈 <strong>EV分析（4bet到${fourSize}bb）：</strong>`);
+      lines.push(`估算对手防守率 = ${(d4*100).toFixed(0)}% → 弃牌率 = ${(fe4*100).toFixed(0)}%`);
+      lines.push(`4bet EV ≈ ${ev4bet.toFixed(2)}bb`);
+      if(ev4bet>0) lines.push(`→ +EV ✅`);
+      else lines.push(`→ EV为负，除非对手弃牌过多否则不建议 ⚠️`);
+    }
+  }
+  return lines.join('<br>');
+}
+
+// 手牌类型描述
+function handTypeDesc(h){
+  if(h.r1===h.r2) return '口袋对子';
+  let high=Math.max(RANK_IDX[h.r1],RANK_IDX[h.r2]);
+  let low=Math.min(RANK_IDX[h.r1],RANK_IDX[h.r2]);
+  let gap=high-low;
+  let type=h.suited?'同花':'非同花';
+  let desc=type;
+  if(gap<=2&&!h.suited) desc+='连牌';
+  else if(gap<=2&&h.suited) desc+='连牌';
+  else if(gap===3) desc+='隔张';
+  if(high<=6) desc='低张'+type;
+  if(low<=3&&high>=10) desc=`高低张${type}`;
+  return desc;
+}
+
+// 范围位置说明
+function posRangeNote(pos){
+  let notes={
+    UTG:'UTG是6人桌最紧的位置，之后还有5人未行动，需要强牌才有+EV。加注范围约15%，以高对和大高张为主。',
+    HJ:'HJ比UTG多一个位置优势，范围可放宽到约21%，加入更多同花连牌和中对。',
+    CO:'CO是关煞位，范围约29%，可加入更多投机牌（小对子、同花连牌）和部分非同花高张。',
+    BTN:'BTN是6人桌最有价值的位置，翻后永远有位置优势。范围最宽约43%，可加入大量低张同花牌和投机牌。',
+    SB:'SB虽然有位置优势（翻后第一个行动），但加注可以偷盲。范围约37%，但翻后OOP需要更谨慎。',
+    BB:'BB已投入盲注，面对加注可用更宽范围防守，但此处只考虑BB的翻前加注情形。'
+  };
+  return notes[pos]||'';
+}
+
+// ---- 局面生成（增加多样性，包含应弃牌的手牌）----
+function randomHandFromRange(rangeList){
+  if(!rangeList||rangeList.length===0) return null;
+  let s=rangeList[Math.floor(Math.random()*rangeList.length)];
+  return parseHand(s);
+}
+
+function allHandKeys(){
+  let keys=[];
+  for(let i=0;i<13;i++){for(let j=0;j<13;j++){if(i===j) keys.push(RANKS[i]+RANKS[i]);else if(i<j) keys.push(RANKS[i]+RANKS[j]+'s');else keys.push(RANKS[i]+RANKS[j]+'o');}}
+  return keys;
+}
+
+function generateScenario(){
+  let types=['rfi','rfi','facing_raise','facing_raise','facing_3bet'];
+  let type=types[Math.floor(Math.random()*types.length)];
+
+  if(type==='rfi'){
+    let pos=POS_NAMES[Math.floor(Math.random()*5)];
+    let range=RFI_RANGES[pos];
+    let allKeys=allHandKeys();
+    let rfiSet=rangeToSet(range);
+    // 40%概率生成在范围外的牌（测试弃牌判断）
+    let outOfRange=false;
+    let hand;
+    if(Math.random()<0.4){
+      let outKeys=allKeys.filter(k=>!rfiSet.has(k));
+      // 排除太离谱的手牌（比如 32o）
+      let reasonableOut=outKeys.filter(k=>{
+        let h=parseHand(k);if(!h) return false;
+        let i1=RANK_IDX[h.r1],i2=RANK_IDX[h.r2];
+        let high=Math.max(i1,i2),low=Math.min(i1,i2),gap=high-low;
+        if(h.r1===h.r2&&high<=6) return false; // 太小的对子不出现
+        if(!h.suited&&high>=8&&gap<=3) return true; // 看起来像可玩牌的非同花
+        if(h.suited&&high-low<=3) return true; // 同花连牌
+        if(h.suited&&high<=7) return false; // 太小的同花
+        return false;
+      });
+      if(reasonableOut.length>0&&Math.random()<0.5){
+        hand=parseHand(reasonableOut[Math.floor(Math.random()*reasonableOut.length)]);
+        outOfRange=true;
+      }
+    }
+    if(!hand){
+      hand=randomHandFromRange(range);
+      if(!hand) return generateScenario();
+    }
+    return {
+      type:'rfi', pos, hand, outOfRange,
+      desc:`你坐在 <strong>${pos}</strong>，前面无人加注。`,
+      actionDesc:`是否加注入池？`,
+      actions:['fold','raise'],
+      defaultSize:pos==='SB'?2.5:3,
+      sizeMin:2, sizeMax:5
+    };
+  }
+  else if(type==='facing_raise'){
+    let ri=Math.floor(Math.random()*4);
+    let raiser=POS_NAMES[ri];
+    let possible=[];
+    for(let i=ri+1;i<6;i++) possible.push(POS_NAMES[i]);
+    if(possible.length===0) return generateScenario();
+    let pos=possible[Math.floor(Math.random()*possible.length)];
+    let vs=VS_RAISE[pos];
+    if(!vs) return generateScenario();
+    let combined=[...new Set([...vs.call,...vs.raise])];
+    let size=ri<2?2.5:3;
+    let inRangeCombined=rangeToSet(combined);
+    let hand;
+    let outOfRange=false;
+    // 40%概率生成应弃牌手牌
+    if(Math.random()<0.4){
+      let allKeys=allHandKeys();
+      let outKeys=allKeys.filter(k=>!inRangeCombined.has(k));
+      let reasonableOut=outKeys.filter(k=>{
+        let h=parseHand(k);if(!h) return false;
+        let i1=RANK_IDX[h.r1],i2=RANK_IDX[h.r2];
+        let high=Math.max(i1,i2),gap=high-Math.min(i1,i2);
+        if(h.r1===h.r2&&high>=7) return true; // 中等对子但不在防守范围
+        if(h.suited&&high>=7&&gap<=4) return true;
+        return false;
+      });
+      if(reasonableOut.length>0&&Math.random()<0.5){
+        hand=parseHand(reasonableOut[Math.floor(Math.random()*reasonableOut.length)]);
+        outOfRange=true;
+      }
+    }
+    if(!hand) hand=randomHandFromRange(combined);
+    if(!hand) return generateScenario();
+    return {
+      type:'facing_raise', pos, hand, raiser, size, outOfRange,
+      desc:`你坐在 <strong>${pos}</strong>，<strong>${raiser}</strong> 加注到 <strong>${size}bb</strong>。`,
+      actionDesc:`你要如何回应？`,
+      actions:['fold','call','raise'],
+      defaultSize:pos==='SB'?9:10,
+      sizeMin:6, sizeMax:14
+    };
+  }
+  else {
+    let oi=Math.floor(Math.random()*4);
+    let ourPos=POS_NAMES[oi];
+    let possible=[];
+    for(let i=oi+1;i<6;i++) possible.push(POS_NAMES[i]);
+    if(possible.length===0) return generateScenario();
+    let threePos=possible[Math.floor(Math.random()*possible.length)];
+    let ourRange=RFI_RANGES[ourPos];
+    let vs3=VS_3BET[ourPos]||{call:[],raise:[]};
+    let combined=[...new Set([...ourRange,...vs3.call,...vs3.raise])];
+    let threeSize=threePos==='SB'||threePos==='BB'?11:9.5;
+    let ourSize=oi<2?2.5:3;
+    let hand=randomHandFromRange(combined);
+    if(!hand) return generateScenario();
+    return {
+      type:'facing_3bet', pos:ourPos, hand, raiser:threePos, size:ourSize, threeSize, outOfRange:false,
+      desc:`你从 <strong>${ourPos}</strong> 加注到 <strong>${ourSize}bb</strong>，<strong>${threePos}</strong> 3bet 到 <strong>${threeSize}bb</strong>。`,
+      actionDesc:`你要如何回应？`,
+      actions:['fold','call','raise'],
+      defaultSize:threeSize+8,
+      sizeMin:20, sizeMax:50
+    };
+  }
+}
+
+// ---- 行动评估（GTO + EV分析）----
+function evaluateAction(sc, act){
+  let result={correct:false,score:0,message:'',detail:'',evAnalysis:'',callSet:null,raiseSet:null,title:''};
+  let hs=handToStr(sc.hand).toUpperCase();
+  let equity=estimateEquity(sc.hand, sc.pos);
+  let evText=buildEVAnalysis(sc, act, equity);
+
+  if(sc.type==='rfi'){
+    let rfiS=rangeToSet(RFI_RANGES[sc.pos]);
+    let isIn=rfiS.has(hs);
+
+    if(act.action==='raise'){
+      if(isIn){
+        result.correct=true; result.score=90;
+        result.message='✓ 加注入池 - GTO推荐行动';
+        result.detail=`你的 ${hs} 在 <strong>${sc.pos}</strong> 的 GTO 加注范围内。<br><br>`;
+        result.detail+=`<strong>为什么这是+EV：</strong><br>`;
+        result.detail+=`• 从 ${sc.pos} 加注的标准范围约占全部手牌的 <strong>${RFI_PCT[sc.pos]}%</strong><br>`;
+        result.detail+=`• 你的手牌有约 <strong>${equity}%</strong> 的底池权益<br>`;
+        if(sc.pos==='BTN') result.detail+=`• BTN有翻后位置优势，权益实现率高，可放宽加注范围<br>`;
+        if(sc.pos==='UTG') result.detail+=`• UTG加注范围偏紧，但你的手牌在该范围内有足够的可玩性<br>`;
+        if(sc.hand.suited) result.detail+=`• 同花结构增加了翻后可玩性和隐含赔率<br>`;
+        if(sc.hand.r1===sc.hand.r2) result.detail+=`• 对子有中暗能力，隐含赔率高<br>`;
+        result.detail+=`• 弃牌EV=0，加注EV为正数 → 行动价值 > 0<br><br>`;
+        result.detail+=posRangeNote(sc.pos);
+      } else {
+        result.correct=false; result.score=20;
+        result.message='✗ 不应加注 - 不在GTO范围';
+        result.detail=`你的 ${hs} 不在 <strong>${sc.pos}</strong> 的 GTO 加注范围内。<br><br>`;
+        result.detail+=`<strong>为什么这是-EV：</strong><br>`;
+        result.detail+=`• ${sc.pos} 的标准加注范围约 ${RFI_PCT[sc.pos]}%<br>`;
+        let weakerInfo={
+          UTG:'• UTG后面还有5人未行动，用弱牌加注容易被挤压或跟注后OOP打<br>• 你的手牌对抗跟注范围的权益不足，翻后难实现EV',
+          HJ:'• HJ虽然比UTG宽一些，但这手牌的可玩性仍不足以正EV开池',
+          CO:'• CO位置可稍微放宽，但这手牌面对盲注的防守范围权益不足',
+          BTN:'• BTN范围已很宽，但这手牌即使有位置优势也难以正EV',
+          SB:'• SB加注后翻后OOP，这手牌的可玩性不足以弥补位置劣势'
+        };
+        result.detail+=weakerInfo[sc.pos]||'';
+      }
+    } else {
+      if(isIn){
+        result.correct=false; result.score=30;
+        result.message='✗ 弃牌太紧 - 应加注入池';
+        result.detail=`你的 ${hs} 在 <strong>${sc.pos}</strong> 的 GTO 加注范围内。<br><br>`;
+        result.detail+=`<strong>为什么弃牌是-EV：</strong><br>`;
+        result.detail+=`• 这手牌对抗盲注的随机牌有约 <strong>${equity}%</strong> 的权益优势<br>`;
+        result.detail+=`• 弃牌EV=0，但加注有正EV，每次弃牌相当于损失价值的期望值<br>`;
+        result.detail+=`• 弃牌太频繁会被激进玩家剥削（你弃牌太多他们会更频繁地偷盲）<br>`;
+      } else {
+        result.correct=true; result.score=95;
+        result.message='✓ 弃牌 - GTO推荐行动';
+        result.detail=`你的 ${hs} 不在 <strong>${sc.pos}</strong> 的 GTO 加注范围内。<br><br>`;
+        result.detail+=`<strong>为什么弃牌是+EV：</strong><br>`;
+        result.detail+=`• 从该位置用这手牌加注的EV为负<br>`;
+        result.detail+=`• 弃牌避免了在不利位置用弱牌对抗强范围<br>`;
+        result.detail+=`• 保留筹码等待更好的机会（选择性激进）<br>`;
+      }
+    }
+    result.raiseSet=rfiS;
+    result.title=`${sc.pos} GTO 加注范围 (${RFI_RANGES[sc.pos].length}种组合, ${RFI_PCT[sc.pos]}%)`;
+
+  } else if(sc.type==='facing_raise'){
+    let vs=VS_RAISE[sc.pos];
+    if(!vs) return result;
+    let cS=rangeToSet(vs.call), rS=rangeToSet(vs.raise);
+    let shCall=cS.has(hs), shRaise=rS.has(hs);
+    let callAmt=sc.size||2.5;
+    let potBefore=1.5+callAmt;
+    let po=potOdds(callAmt,potBefore);
+    let reqEq=po/realizationFactor(sc.pos,sc.raiser);
+
+    if(act.action==='fold'){
+      if(shCall||shRaise){
+        result.correct=false; result.score=15;
+        result.message='✗ 弃牌过紧 - 应防守';
+        result.detail=`面对 ${sc.raiser} 的 ${callAmt}bb 加注，你的 ${hs} 在 GTO 防守范围内。<br><br>`;
+        result.detail+=`<strong>为什么弃牌是-EV：</strong><br>`;
+        result.detail+=`• 底池已有 ${(potBefore).toFixed(1)}bb，跟注 ${callAmt}bb 的底池赔率 = ${po.toFixed(1)}%<br>`;
+        result.detail+=`• 你的手牌有约 ${equity}% 的权益，超过所需 ${reqEq.toFixed(1)}%<br>`;
+        result.detail+=`• 弃牌让你放弃了这部分正EV<br>`;
+        if(sc.pos==='BTN'||sc.pos==='CO') result.detail+=`• 你有位置优势，翻后可更好实现权益<br>`;
+        result.detail+=`• 面对 ${sc.raiser} 的范围，你的手牌有足够的可玩性`;
+      } else {
+        result.correct=true; result.score=90;
+        result.message='✓ 弃牌 - GTO推荐';
+        result.detail=`面对 ${sc.raiser} 的加注，你的 ${hs} 不在 GTO 防守范围内。<br><br>`;
+        result.detail+=`<strong>为什么弃牌是+EV：</strong><br>`;
+        result.detail+=`• 你的权益约 ${equity}%，需要约 ${reqEq.toFixed(1)}%才能保本<br>`;
+        result.detail+=`• 权益不足，跟注是 -EV<br>`;
+        result.detail+=`• 即使3bet也难以迫使更好的牌弃牌<br>`;
+        result.detail+=`• 在 ${sc.pos} 面对 ${sc.raiser} 的加注，防守标准偏紧是正确的`;
+      }
+    } else if(act.action==='call'){
+      if(shCall){
+        result.correct=true; result.score=85;
+        result.message='✓ 跟注 - GTO推荐行动';
+        result.detail=`你的 ${hs} 在 GTO 跟注范围内。<br><br>`;
+        result.detail+=`<strong>为什么跟注是+EV：</strong><br>`;
+        result.detail+=`• 底池赔率 = ${po.toFixed(1)}%，你需约 ${reqEq.toFixed(1)}% 的翻后权益实现<br>`;
+        result.detail+=`• 你的手牌权益约 ${equity}%，满足赔率要求<br>`;
+        let extra='';
+        if(sc.hand.suited) extra+='• 同花结构增加了翻后的可玩性和隐含赔率<br>';
+        if(sc.hand.r1===sc.hand.r2) extra+='• 对子可中暗三条，隐含赔率高<br>';
+        if(sc.pos==='BTN'||sc.pos==='CO') extra+=`• 在 ${sc.pos} 有位置优势，可最大化权益实现<br>`;
+        result.detail+=extra;
+      } else if(shRaise){
+        result.correct=false; result.score=45;
+        result.message='✗ 应3bet而非跟注';
+        result.detail=`你的 ${hs} 在 GTO 策略中更倾向于 3bet。<br><br>`;
+        result.detail+=`<strong>为什么3bet优于跟注：</strong><br>`;
+        result.detail+=`• 这手牌强度足以3bet获取价值<br>`;
+        result.detail+=`• 平跟会让对手的弱牌廉价看翻牌，且容易被挤压<br>`;
+        result.detail+=`• 3bet可以立即拿下底池（弃牌率收益）<br>`;
+      } else {
+        result.correct=false; result.score=20;
+        result.message='✗ 不建议跟注';
+        result.detail=`你的 ${hs} 不适合防守这个加注。<br><br>`;
+        result.detail+=`<strong>为什么跟注是-EV：</strong><br>`;
+        result.detail+=`• 你的权益约 ${equity}%，低于所需的 ${reqEq.toFixed(1)}%<br>`;
+        result.detail+=`• 翻后难以实现权益，容易被对手的范围压制<br>`;
+        result.detail+=`• 弃牌或（在合适位置时）3bet诈唬是更好的选择`;
+      }
+    } else if(act.action==='raise'){
+      if(shRaise){
+        let ok=act.size>=sc.sizeMin&&act.size<=sc.sizeMax;
+        if(ok){
+          result.correct=true; result.score=90;
+          result.message='✓ 3bet 尺度合理 - GTO推荐';
+          result.detail=`你的 ${hs} 在 GTO 3bet 范围内。<br><br>`;
+          result.detail+=`<strong>为什么3bet是+EV：</strong><br>`;
+          result.detail+=`• 这手牌有足够的强度和价值<br>`;
+          result.detail+=`• 3bet到 ${act.size}bb 迫使对手的弱牌弃牌（弃牌率收益）<br>`;
+          if(equity>60) result.detail+=`• 你的手牌对抗对手跟注范围有 ${equity}%+ 的权益<br>`;
+          else result.detail+=`• 虽然是诈唬3bet，但有 ${equity}% 的权益作为后手保障<br>`;
+        } else {
+          result.correct=false; result.score=55;
+          result.message='⚠ 3bet方向正确但尺度需调整';
+          result.detail=`GTO推荐 3bet 尺度为 ${sc.sizeMin}-${sc.sizeMax}bb。<br>你的 ${act.size}bb ${act.size<sc.sizeMin?'偏小，让对手用宽范围跟注':'偏大，风险回报比不合理'}。`;
+        }
+      } else if(shCall){
+        result.correct=false; result.score=40;
+        result.message='✗ 应跟注而非3bet';
+        result.detail=`这手牌更适合跟注。<br><br>`;
+        result.detail+=`<strong>为什么跟注优于3bet：</strong><br>`;
+        result.detail+=`• 这手牌强度不足以价值3bet<br>`;
+        result.detail+=`• 作为诈唬3bet又缺乏后续的牌力保障<br>`;
+        result.detail+=`• 跟注可以在有利位置看翻牌，利用翻后技术优势`;
+      } else {
+        result.correct=false; result.score=15;
+        result.message='✗ 不建议3bet';
+        result.detail=`这手牌太弱不宜 3bet。<br>弃牌是更好的选择。`;
+      }
+    }
+    result.callSet=cS; result.raiseSet=rS;
+    result.title=`${sc.pos} vs ${sc.raiser} GTO防守范围`;
+
+  } else if(sc.type==='facing_3bet'){
+    let vs3=VS_3BET[sc.pos];
+    if(!vs3) return result;
+    let cS=rangeToSet(vs3.call), rS=rangeToSet(vs3.raise);
+    let shCall=cS.has(hs), shRaise=rS.has(hs);
+    let callAmt=sc.threeSize-sc.size;
+    let potBefore=1.5+sc.size+sc.threeSize;
+    let po=potOdds(callAmt,potBefore);
+
+    if(act.action==='fold'){
+      if(shCall||shRaise){
+        result.correct=false; result.score=15;
+        result.message='✗ 弃牌过紧 - 应防守3bet';
+        result.detail=`面对 ${sc.raiser} 的 3bet，你的 ${hs} 在 GTO 防守范围内。<br><br>`;
+        result.detail+=`<strong>为什么弃牌是-EV：</strong><br>`;
+        result.detail+=`• 底池赔率约 ${po.toFixed(1)}%，你的权益约 ${equity}%<br>`;
+        result.detail+=`• 你的手牌有足够的可玩性跟注或4bet<br>`;
+        result.detail+=`• 弃牌太频繁会被激进玩家用宽范围3bet剥削`;
+      } else {
+        result.correct=true; result.score=90;
+        result.message='✓ 弃牌 - GTO推荐';
+        result.detail=`你的 ${hs} 不适合防守这个 3bet。<br><br>`;
+        result.detail+=`<strong>为什么弃牌是+EV：</strong><br>`;
+        result.detail+=`• 你的手牌对抗3bet范围的权益不足<br>`;
+        result.detail+=`• 跟注后翻后难以实现权益（OOP）<br>`;
+        result.detail+=`• 4bet会迫使更弱的牌弃牌而更强的牌跟注，风险回报比差`;
+      }
+    } else if(act.action==='call'){
+      if(shCall){
+        result.correct=true; result.score=85;
+        result.message='✓ 跟注 - GTO推荐';
+        result.detail=`你的 ${hs} 适合跟注 3bet。<br><br>`;
+        result.detail+=`<strong>为什么跟注是+EV：</strong><br>`;
+        result.detail+=`• 底池赔率 = ${po.toFixed(1)}%<br>`;
+        result.detail+=`• 你的手牌有足够的可玩性（如中暗、听牌潜力）<br>`;
+        result.detail+=`• 跟注保留了翻后操作空间，可最大化手牌价值`;
+      } else if(shRaise){
+        result.correct=false; result.score=40;
+        result.message='✗ 应4bet而非跟注';
+        result.detail=`这手牌在 GTO 策略中应 4bet。<br>平跟会错失价值且容易被 5bet 诈唬剥削。`;
+      } else {
+        result.correct=false; result.score=20;
+        result.message='✗ 不建议跟注';
+        result.detail=`手牌太弱不适合跟注 3bet。`;
+      }
+    } else if(act.action==='raise'){
+      if(shRaise){
+        let ok=act.size>=sc.sizeMin&&act.size<=sc.sizeMax;
+        if(ok){
+          result.correct=true; result.score=90;
+          result.message='✓ 4bet 尺度合理 - GTO推荐';
+          result.detail=`你的 ${hs} 在 GTO 4bet 范围内。<br><br>`;
+          result.detail+=`<strong>为什么4bet是+EV：</strong><br>`;
+          result.detail+=`• 这手牌强度足以价值4bet<br>`;
+          result.detail+=`• 4bet到 ${act.size}bb 让对手的诈唬3bet难以获利<br>`;
+          if(equity>60) result.detail+=`• 对抗对手的跟注范围有 ${equity}%+ 的权益<br>`;
+          else result.detail+=`• 作为4bet诈唬，手牌有后续发展性<br>`;
+        } else {
+          result.correct=false; result.score=55;
+          result.message='⚠ 4bet方向正确但尺度需调整';
+          result.detail=`GTO推荐 4bet 尺度为 ${sc.sizeMin}-${sc.sizeMax}bb。`;
+        }
+      } else if(shCall){
+        result.correct=false; result.score=40;
+        result.message='✗ 应跟注而非4bet';
+        result.detail=`这手牌更适合跟注 3bet。`;
+      } else {
+        result.correct=false; result.score=15;
+        result.message='✗ 不建议4bet';
+        result.detail=`手牌太弱不宜 4bet。`;
+      }
+    }
+    result.callSet=cS; result.raiseSet=rS;
+    result.title=`${sc.pos} vs 3bet GTO防守范围 (来自${sc.raiser})`;
+  }
+
+  result.evAnalysis=evText;
+  return result;
+}
+
+// ---- UI 渲染 ----
+function showScenario(sc){
+  document.getElementById('scenarioText').innerHTML=sc.desc+'<br>'+sc.actionDesc;
+  let badge=document.getElementById('scenarioBadge');
+  let tn={rfi:'翻前加注',facing_raise:'面对加注',facing_3bet:'面对3bet'};
+  badge.innerHTML=`<span class="scenario-type-badge ${sc.type}">${tn[sc.type]||sc.type}</span>`;
+
+  // 牌面
+  let h=sc.hand;
+  let suits=['♠','♥','♦','♣'];
+  let s1=suits[Math.floor(Math.random()*4)];
+  let s2=h.suited?s1:(()=>{let s=suits[Math.floor(Math.random()*4)];while(s===s1)s=suits[Math.floor(Math.random()*4)];return s;})();
+  let r1=h.r1,r2=h.r2;
+  document.getElementById('c1rank').textContent=r1;
+  document.getElementById('c1suit').textContent=s1;
+  document.getElementById('c2rank').textContent=r2;
+  document.getElementById('c2suit').textContent=s2;
+  let c1=document.getElementById('card1'),c2=document.getElementById('card2');
+  c1.className='card-single '+(s1==='♥'||s1==='♦'?'red':'black');
+  c2.className='card-single '+(s2==='♥'||s2==='♦'?'red':'black');
+  let l1=r1+s1,l2=r2+s2;
+  document.getElementById('c1label').textContent=l1;
+  document.getElementById('c1labelBr').textContent=l1;
+  document.getElementById('c2label').textContent=l2;
+  document.getElementById('c2labelBr').textContent=l2;
+
+  // 按钮可见性
+  let show={fold:false,check:false,call:false,raise:false};
+  sc.actions.forEach(a=>show[a]=true);
+  document.querySelector('[data-action="fold"]').style.display=show.fold?'block':'none';
+  document.getElementById('checkBtn').style.display=show.check?'block':'none';
+  document.getElementById('callBtn').style.display=show.call?'block':'none';
+  document.querySelector('[data-action="raise"]').style.display=show.raise?'block':'none';
+
+  // 重置UI
+  document.querySelectorAll('.btn.active').forEach(b=>b.classList.remove('active'));
+  document.getElementById('raiseSizeRow').style.display='none';
+  document.getElementById('resultArea').classList.remove('show');
+  document.getElementById('rangeGridWrap').style.display='none';
+  document.getElementById('submitBtn').disabled=true;
+  window._scenario=sc; window._submitted=false; window._userAction=null;
+
+  // 默认加注尺寸
+  if(sc.defaultSize) document.getElementById('raiseSize').value=sc.defaultSize;
+}
+
+function showResult(result, sc){
+  let area=document.getElementById('resultArea');
+  area.classList.add('show');
+
+  let title=document.getElementById('resultTitle');
+  if(result.correct){
+    title.className='result-title correct';
+    title.innerHTML=`<span class="icon">✅</span> ${result.message}`;
+  } else if(result.score>=50){
+    title.className='result-title partial';
+    title.innerHTML=`<span class="icon">⚠️</span> ${result.message}`;
+  } else {
+    title.className='result-title wrong';
+    title.innerHTML=`<span class="icon">❌</span> ${result.message}`;
+  }
+
+  let analysis='';
+  analysis+=`<strong>位置：</strong>${sc.pos}<br>`;
+  analysis+=`<strong>手牌：</strong>${handToStr(sc.hand)}<br>`;
+  if(sc.type==='rfi'){
+    analysis+=`<strong>局面：</strong>翻前无人加注，到${sc.pos}<br>`;
+    let strength=handTypeDesc(sc.hand);
+    analysis+=`<strong>类型：</strong>${strength}<br>`;
+    analysis+=`<hr style="border-color:var(--border);margin:6px 0">${result.detail}`;
+    let cnt=RFI_RANGES[sc.pos]?RFI_RANGES[sc.pos].length:0;
+    analysis+=`<br><br>📊 ${sc.pos} GTO加注范围包含 <strong>${cnt}</strong> 种手牌组合 (约${RFI_PCT[sc.pos]}%)。`;
+  } else if(sc.type==='facing_raise'){
+    analysis+=`<strong>局面：</strong>${sc.raiser}加注${sc.size}bb，你在${sc.pos}<br>`;
+    analysis+=`<hr style="border-color:var(--border);margin:6px 0">${result.detail}`;
+  } else if(sc.type==='facing_3bet'){
+    analysis+=`<strong>局面：</strong>你从${sc.pos}加注，${sc.raiser}3bet到${sc.threeSize}bb<br>`;
+    analysis+=`<hr style="border-color:var(--border);margin:6px 0">${result.detail}`;
+  }
+
+  // ---- EV分析区块 ----
+  if(result.evAnalysis){
+    analysis+=`<br><br><div style="background:#0f1a2e;border-radius:8px;padding:10px;margin-top:4px;border-left:3px solid var(--gold)">`;
+    analysis+=result.evAnalysis;
+    analysis+=`</div>`;
+  }
+  document.getElementById('resultDetail').innerHTML=analysis;
+
+  let gw=document.getElementById('rangeGridWrap');
+  gw.style.display='block';
+  renderRangeGrid('rangeGrid','rangeGridTitle',result.title,result.callSet,result.raiseSet,handToStr(sc.hand).toUpperCase());
+}
+
+// ---- 事件绑定 ----
+document.querySelectorAll('[data-action]').forEach(btn=>{
+  btn.addEventListener('click',function(){
+    if(window._submitted) return;
+    document.querySelectorAll('.btn.active').forEach(b=>b.classList.remove('active'));
+    this.classList.add('active');
+    let a=this.dataset.action;
+    document.getElementById('raiseSizeRow').style.display=(a==='raise'?'flex':'none');
+    window._userAction={action:a};
+    if(window._scenario) document.getElementById('submitBtn').disabled=false;
+  });
+});
+
+document.querySelectorAll('.raise-btn').forEach(btn=>{
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.raise-btn').forEach(b=>b.classList.remove('sel'));
+    this.classList.add('sel');
+    document.getElementById('raiseSize').value=this.dataset.size;
+  });
+});
+document.getElementById('raiseSize').addEventListener('input',function(){
+  document.querySelectorAll('.raise-btn').forEach(b=>{
+    b.classList.toggle('sel',Math.abs(parseFloat(b.dataset.size)-parseFloat(this.value))<0.1);
+  });
+});
+
+document.getElementById('submitBtn').addEventListener('click',function(){
+  if(!window._scenario||!window._userAction||window._submitted) return;
+  let act=window._userAction.action;
+  if(act==='raise'){
+    let sz=parseFloat(document.getElementById('raiseSize').value)||3;
+    if(sz<2) sz=2;
+    if(sz>50) sz=50;
+    document.getElementById('raiseSize').value=sz;
+    window._userAction.size=sz;
+  }
+  let result=evaluateAction(window._scenario, window._userAction);
+  window._submitted=true; this.disabled=true;
+  let st=window._state||{total:0,correct:0,wrong:0};
+  st.total++; if(result.correct) st.correct++; else st.wrong++;
+  window._state=st;
+  document.getElementById('totalQ').textContent=st.total;
+  document.getElementById('correctQ').textContent=st.correct;
+  document.getElementById('wrongQ').textContent=st.wrong;
+  showResult(result, window._scenario);
+});
+
+function newHand(){
+  let sc=generateScenario();
+  showScenario(sc);
+  document.getElementById('submitBtn').disabled=true;
+  document.getElementById('resultArea').classList.remove('show');
+  document.getElementById('rangeGridWrap').style.display='none';
+}
+
+document.getElementById('nextBtn').addEventListener('click',newHand);
+document.getElementById('newHandBtn').addEventListener('click',newHand);
+
+// ---- 注册 Service Worker (PWA安装支持) ----
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js');
+}
+
+// ---- 初始化 ----
+window._state={total:0,correct:0,wrong:0};
+newHand();
+</script>
+</body>
+</html>
