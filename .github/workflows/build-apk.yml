@@ -43,29 +43,46 @@ jobs:
 
       - name: 签名并对齐 APK
         run: |
-          # 安装 build-tools (包含 zipalign)
+          # 安装 build-tools（包含 apksigner, zipalign）
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0" 2>/dev/null || true
           
-          # 生成调试密钥
+          # 找到构建工具目录
+          BUILD_TOOLS=$(find "$ANDROID_HOME" -type d -name "34.0.0" 2>/dev/null | head -1)
+          
+          UNSIGNED=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          ALIGNED=app-aligned.apk
+          FINAL=翻前训练器yifan-v1.0.apk
+          
+          # 1. 对齐（先对齐再签名）
+          if [ -n "$BUILD_TOOLS" ] && [ -f "$BUILD_TOOLS/zipalign" ]; then
+            "$BUILD_TOOLS/zipalign" -v -p 4 "$UNSIGNED" "$ALIGNED"
+          else
+            cp "$UNSIGNED" "$ALIGNED"
+          fi
+          
+          # 2. 生成密钥库
           keytool -genkey -v -keystore release.keystore -alias pktrainer \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=PKTrainer, OU=Dev, O=Trainer, L=City, ST=State, C=CN"
           
-          UNSIGNED=android/app/build/outputs/apk/release/app-release-unsigned.apk
-          
-          # 签名
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-            -keystore release.keystore -storepass android \
-            "$UNSIGNED" pktrainer
-          
-          # 对齐
-          ZIPALIGN=$(find "$ANDROID_HOME" -name "zipalign" -type f 2>/dev/null | head -1)
-          if [ -n "$ZIPALIGN" ]; then
-            "$ZIPALIGN" -v -p 4 "$UNSIGNED" 翻前训练器yifan-v1.0.apk
+          # 3. 使用 apksigner 签名（正确的现代方式）
+          if [ -n "$BUILD_TOOLS" ] && [ -f "$BUILD_TOOLS/apksigner" ]; then
+            "$BUILD_TOOLS/apksigner" sign --ks release.keystore \
+              --ks-pass pass:android --key-pass pass:android \
+              --ks-key-alias pktrainer \
+              --out "$FINAL" "$ALIGNED"
           else
-            # zipalign不可用时直接复制
-            cp "$UNSIGNED" 翻前训练器yifan-v1.0.apk
+            # 降级使用 jarsigner
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+              -keystore release.keystore -storepass android \
+              "$ALIGNED" pktrainer
+            mv "$ALIGNED" "$FINAL"
+          fi
+          
+          # 4. 验证签名
+          if [ -n "$BUILD_TOOLS" ] && [ -f "$BUILD_TOOLS/apksigner" ]; then
+            "$BUILD_TOOLS/apksigner" verify "$FINAL" && echo "签名验证通过 ✅" || echo "签名验证失败 ❌"
           fi
 
       - name: 上传 APK
