@@ -53,7 +53,7 @@ jobs:
             -keystore release.keystore -storepass android \
             android/app/build/outputs/apk/release/app-release-unsigned.apk pktrainer
           # 对齐
-          zipalign -v -p 4 \
+          find "$ANDROID_HOME" -name "zipalign" -type f 2>/dev/null | head -1 | xargs -I{} {} -v -p 4 \
             android/app/build/outputs/apk/release/app-release-unsigned.apk \
             翻前训练器yifan-v1.0.apk
 
