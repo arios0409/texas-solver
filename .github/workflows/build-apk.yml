@@ -28,26 +28,26 @@ jobs:
           cp manifest.json android/app/src/main/assets/ 2>/dev/null || true
           cp sw.js android/app/src/main/assets/ 2>/dev/null || true
 
-      - name: 授权 Gradle 执行
-        run: chmod +x android/gradlew 2>/dev/null || true
-
-      - name: 用 Gradle 构建 APK
-        working-directory: ./android
+      - name: 生成 Gradle Wrapper
         run: |
-          # 如果没有gradlew, 用gradle命令
-          if [ ! -f gradlew ]; then
-            gradle assembleRelease --no-daemon
-          else
-            ./gradlew assembleRelease --no-daemon
-          fi
+          cd android
+          # 生成gradlew脚本
+          gradle wrapper --gradle-version 8.2
+          chmod +x gradlew
 
-      - name: 签名 APK
+      - name: 构建 Release APK
         run: |
-          # 生成调试签名密钥
+          cd android
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          ./gradlew assembleRelease --no-daemon -x lint
+
+      - name: 签名并对齐 APK
+        run: |
+          # 生成调试密钥
           keytool -genkey -v -keystore release.keystore -alias pktrainer \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
-            -dname "CN=翻前训练器, OU=PK, O=Trainer, L=City, S=State, C=CN"
+            -dname "CN=PKTrainer, OU=Dev, O=Trainer, L=City, S=State, C=CN"
           # 签名
           jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
             -keystore release.keystore -storepass android \
