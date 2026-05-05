@@ -1,5 +1,5 @@
 // Auto-generated GTO range data from TexasSolver
-// Generated: 2026-05-05 23:08:29
+// Generated: 2026-05-05 23:27:09
 
 const GTO_RANGES = {
   "rfi": {
@@ -2668,9 +2668,9 @@ const GTO_RANGES = {
     "BB": {}
   },
   "rfi_pct": {
-    "UTG": 27,
-    "HJ": 32,
-    "CO": 43,
+    "UTG": 32,
+    "HJ": 39,
+    "CO": 51,
     "BTN": 73,
     "SB": 76
   }

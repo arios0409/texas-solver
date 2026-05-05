@@ -131,7 +131,9 @@ def find_ranges():
             
             # --- RFI: first player raises, second player calls ---
             # Path: {Pos}/{Size}/{Responder}/Call/{Pos}_range.txt
-            if (len(actions) >= 2 and
+            # MUST have exactly 2 actions (open+call) — len>2 means deeper path
+            # like squeeze or 3bet which are NOT RFI
+            if (len(actions) == 2 and
                 actions[0]['action'] == 'raise' and
                 actions[1]['action'] == 'call' and
                 player_name == actions[0]['player']):
