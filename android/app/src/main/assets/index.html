@@ -222,13 +222,8 @@ body{
       <button class="btn btn-raise" data-action="raise">加注</button>
     </div>
     <div class="raise-size-row" id="raiseSizeRow" style="display:none">
-      <input type="number" class="raise-size-input" id="raiseSize" value="3" min="2" step="0.5">
-      <button class="raise-btn" data-size="2.5">2.5</button>
-      <button class="raise-btn sel" data-size="3">3</button>
-      <button class="raise-btn" data-size="3.5">3.5</button>
-      <button class="raise-btn" data-size="4">4</button>
-      <button class="raise-btn" data-size="10">10</button>
-      <button class="raise-btn" data-size="12">12</button>
+      <input type="number" class="raise-size-input" id="raiseSize" value="3" min="0" step="0.5">
+      <div id="raiseSizingPresets"></div>
     </div>
     <div class="submit-row">
       <button class="btn-submit" id="submitBtn" disabled>提交答案</button>
@@ -366,9 +361,9 @@ function renderRangeGrid(containerId, titleId, title, callSet, raiseSet, current
       let cell=document.createElement('div');
       let key;
       if(i===j) key=RANKS[i]+RANKS[i];
-      else if(i<j) key=RANKS[i]+RANKS[j]+'s';
-      else key=RANKS[i]+RANKS[j]+'o';
-      let label=key.replace(/s$/,'').replace(/o$/,'');
+      else if(i<j) key=RANKS[j]+RANKS[i]+'S';
+      else key=RANKS[i]+RANKS[j]+'O';
+      let label=key.replace(/[SO]$/,'');
       let inCall=callSet&&callSet.has(key);
       let inRaise=raiseSet&&raiseSet.has(key);
       let isCurrent=currentHandStr&&key===currentHandStr;
@@ -558,7 +553,7 @@ function randomHandFromRange(rangeList){
 
 function allHandKeys(){
   let keys=[];
-  for(let i=0;i<13;i++){for(let j=0;j<13;j++){if(i===j) keys.push(RANKS[i]+RANKS[i]);else if(i<j) keys.push(RANKS[i]+RANKS[j]+'s');else keys.push(RANKS[i]+RANKS[j]+'o');}}
+  for(let i=0;i<13;i++){for(let j=0;j<13;j++){if(i===j) keys.push(RANKS[i]+RANKS[i]);else if(i<j) keys.push(RANKS[j]+RANKS[i]+'S');else keys.push(RANKS[i]+RANKS[j]+'O');}}
   return keys;
 }
 
@@ -602,7 +597,7 @@ function generateScenario(){
       actionDesc:`是否加注入池？`,
       actions:['fold','raise'],
       defaultSize:pos==='SB'?2.5:3,
-      sizeMin:2, sizeMax:5
+      sizeMin:0.5, sizeMax:10
     };
   }
   else if(type==='facing_raise'){
@@ -645,7 +640,7 @@ function generateScenario(){
       actionDesc:`你要如何回应？`,
       actions:['fold','call','raise'],
       defaultSize:pos==='SB'?9:10,
-      sizeMin:6, sizeMax:14
+      sizeMin:3, sizeMax:30
     };
   }
   else {
@@ -669,7 +664,7 @@ function generateScenario(){
       actionDesc:`你要如何回应？`,
       actions:['fold','call','raise'],
       defaultSize:threeSize+8,
-      sizeMin:20, sizeMax:50
+      sizeMin:10, sizeMax:80
     };
   }
 }
@@ -911,6 +906,47 @@ function evaluateAction(sc, act){
   return result;
 }
 
+// ---- 底池百分比下注尺度计算 ----
+function getPotSizing(sc){
+  let pot, callAmt, defSize;
+  if(sc.type==='rfi'){
+    // RFI: 底池=1.5bb盲注, bet尺寸就是开池额
+    pot = 1.5;
+    callAmt = 0;
+    defSize = sc.defaultSize || 2.5;
+    // 预设尺寸: 按pot%展示等价的BB数
+    let presets = [67, 100, 133, 167, 200, 267].map(p => ({
+      pct: p,
+      size: Math.round(p/100 * pot * 10) / 10,
+      label: p + '%'
+    }));
+    return {pot, callAmt, defSize, presets};
+  } else if(sc.type==='facing_raise'){
+    // 面对加注: 底池=1.5+open, 跟注额=open, 3bet总额=open+pct×底池
+    pot = 1.5 + sc.size;
+    callAmt = sc.size;
+    defSize = sc.defaultSize || 9;
+    // 预设: 按pot%算3bet总额
+    let presets = [25, 30, 33, 50, 66, 75, 100].map(p => ({
+      pct: p,
+      size: Math.round((callAmt + p/100 * pot) * 10) / 10,
+      label: p + '%'
+    }));
+    return {pot, callAmt, defSize, presets};
+  } else {
+    // 面对3bet: 底池=1.5+open+3bet, 跟注额=3bet, 4bet总额=3bet+pct×底池
+    pot = 1.5 + sc.size + sc.threeSize;
+    callAmt = sc.threeSize;
+    defSize = sc.defaultSize || (sc.threeSize + 8);
+    let presets = [20, 25, 30, 33, 50, 66, 75, 100].map(p => ({
+      pct: p,
+      size: Math.round((callAmt + p/100 * pot) * 10) / 10,
+      label: p + '%'
+    }));
+    return {pot, callAmt, defSize, presets};
+  }
+}
+
 // ---- UI 渲染 ----
 function showScenario(sc){
   document.getElementById('scenarioText').innerHTML=sc.desc+'<br>'+sc.actionDesc;
@@ -953,8 +989,36 @@ function showScenario(sc){
   document.getElementById('submitBtn').disabled=true;
   window._scenario=sc; window._submitted=false; window._userAction=null;
 
-  // 默认加注尺寸
-  if(sc.defaultSize) document.getElementById('raiseSize').value=sc.defaultSize;
+  // 渲染底池百分比下注预设按钮
+  var sizing = getPotSizing(sc);
+  var container = document.getElementById('raiseSizingPresets');
+  container.innerHTML = '';
+  sizing.presets.forEach(function(p, idx){
+    var btn = document.createElement('button');
+    btn.className = 'raise-btn';
+    btn.dataset.size = p.size;
+    btn.textContent = p.label + ' (' + p.size.toFixed(1) + 'bb)';
+    btn.title = '底池 ' + sizing.pot.toFixed(1) + 'bb';
+    container.appendChild(btn);
+  });
+  // 自定义按钮
+  var customBtn = document.createElement('button');
+  customBtn.className = 'raise-btn';
+  customBtn.dataset.size = 'custom';
+  customBtn.textContent = '\u81ea\u5b9a\u4e49';
+  container.appendChild(customBtn);
+
+  // 默认选中最近的预设
+  var defVal = sizing.defSize;
+  var closest = sizing.presets.reduce(function(prev, curr) {
+    return Math.abs(curr.size - defVal) < Math.abs(prev.size - defVal) ? curr : prev;
+  });
+  document.querySelectorAll('.raise-btn').forEach(function(b){ b.classList.remove('sel'); });
+  var targetBtn = Array.from(container.querySelectorAll('.raise-btn')).find(function(b){ return Math.abs(parseFloat(b.dataset.size) - closest.size) < 0.01; });
+  if(targetBtn) targetBtn.classList.add('sel');
+  document.getElementById('raiseSize').value = closest.size;
+  document.getElementById('raiseSize').min = 0.5;
+  document.getElementById('raiseSize').step = 0.5;
 }
 
 function showResult(result, sc){
@@ -1017,16 +1081,29 @@ document.querySelectorAll('[data-action]').forEach(btn=>{
   });
 });
 
-document.querySelectorAll('.raise-btn').forEach(btn=>{
-  btn.addEventListener('click',function(){
-    document.querySelectorAll('.raise-btn').forEach(b=>b.classList.remove('sel'));
-    this.classList.add('sel');
-    document.getElementById('raiseSize').value=this.dataset.size;
+// 事件委托: 动态生成的raise-btn点击
+['click'].forEach(function(evt){
+  document.getElementById('raiseSizingPresets').addEventListener(evt, function(e){
+    var btn = e.target.closest('.raise-btn');
+    if(!btn) return;
+    document.querySelectorAll('.raise-btn').forEach(function(b){ b.classList.remove('sel'); });
+    btn.classList.add('sel');
+    if(btn.dataset.size === 'custom'){
+      // 自定义: 聚焦输入框, 让用户自己输入
+      document.getElementById('raiseSize').focus();
+      document.getElementById('raiseSize').select();
+    } else {
+      document.getElementById('raiseSize').value = btn.dataset.size;
+    }
   });
 });
+
 document.getElementById('raiseSize').addEventListener('input',function(){
-  document.querySelectorAll('.raise-btn').forEach(b=>{
-    b.classList.toggle('sel',Math.abs(parseFloat(b.dataset.size)-parseFloat(this.value))<0.1);
+  var val = parseFloat(this.value);
+  if(isNaN(val)) return;
+  document.querySelectorAll('.raise-btn').forEach(function(b){
+    var bVal = parseFloat(b.dataset.size);
+    b.classList.toggle('sel', !isNaN(bVal) && Math.abs(bVal - val) < 0.1);
   });
 });
 
@@ -1035,10 +1112,10 @@ document.getElementById('submitBtn').addEventListener('click',function(){
   let act=window._userAction.action;
   if(act==='raise'){
     let sz=parseFloat(document.getElementById('raiseSize').value)||3;
-    if(sz<2) sz=2;
-    if(sz>50) sz=50;
-    document.getElementById('raiseSize').value=sz;
-    window._userAction.size=sz;
+    if(sz<0.5) sz=0.5;
+    if(sz>200) sz=200;
+    document.getElementById('raiseSize').value=Math.round(sz*10)/10;
+    window._userAction.size=Math.round(sz*10)/10;
   }
   let result=evaluateAction(window._scenario, window._userAction);
   window._submitted=true; this.disabled=true;
