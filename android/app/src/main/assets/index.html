@@ -291,7 +291,7 @@ function expandRangeStr(str){
   }
   return [...new Set(result)];
 }
-function rangeToSet(arr){let s=new Set();for(let a of arr) s.add(a.toUpperCase());return s;}
+function rangeToSet(arr){let s=new Set();for(let a of arr) s.add(a.toLowerCase());return s;}
 
 // ==== GTO 范围数据（由 TexasSolver 解算器自动生成）====
 const RFI_RANGES = {};
@@ -361,9 +361,9 @@ function renderRangeGrid(containerId, titleId, title, callSet, raiseSet, current
       let cell=document.createElement('div');
       let key;
       if(i===j) key=RANKS[i]+RANKS[i];
-      else if(i<j) key=RANKS[j]+RANKS[i]+'S';
-      else key=RANKS[i]+RANKS[j]+'O';
-      let label=key.replace(/[SO]$/,'');
+      else if(i<j) key=RANKS[j]+RANKS[i]+'s';
+      else key=RANKS[i]+RANKS[j]+'o';
+      let label=key.replace(/[so]$/,'');
       let inCall=callSet&&callSet.has(key);
       let inRaise=raiseSet&&raiseSet.has(key);
       let isCurrent=currentHandStr&&key===currentHandStr;
@@ -672,7 +672,7 @@ function generateScenario(){
 // ---- 行动评估（GTO + EV分析）----
 function evaluateAction(sc, act){
   let result={correct:false,score:0,message:'',detail:'',evAnalysis:'',callSet:null,raiseSet:null,title:''};
-  let hs=handToStr(sc.hand).toUpperCase();
+  let hs=handToStr(sc.hand).toLowerCase();
   let equity=estimateEquity(sc.hand, sc.pos);
   let evText=buildEVAnalysis(sc, act, equity);
 
@@ -1065,7 +1065,7 @@ function showResult(result, sc){
 
   let gw=document.getElementById('rangeGridWrap');
   gw.style.display='block';
-  renderRangeGrid('rangeGrid','rangeGridTitle',result.title,result.callSet,result.raiseSet,handToStr(sc.hand).toUpperCase());
+  renderRangeGrid('rangeGrid','rangeGridTitle',result.title,result.callSet,result.raiseSet,handToStr(sc.hand).toLowerCase());
 }
 
 // ---- 事件绑定 ----
