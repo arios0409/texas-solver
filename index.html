@@ -143,15 +143,13 @@ body{
   font-size:8px;font-weight:600;border-radius:1px;cursor:default;
   font-family:monospace;transition:all .1s
 }
-.range-cell.in-range{background:var(--green);color:#1a1a1a;opacity:.8}
-.range-cell.in-range.current{background:var(--gold);color:#1a1a1a;opacity:1;box-shadow:inset 0 0 0 2px #fff}
-.range-cell.in-range.rec-call{background:var(--blue);color:#fff;opacity:.75}
-.range-cell.in-range.rec-call.current{background:var(--gold);color:#1a1a1a;opacity:1;box-shadow:inset 0 0 0 2px #fff}
-.range-cell.in-range.rec-raise{background:var(--green);color:#1a1a1a;opacity:.75}
-.range-cell.in-range.rec-raise.current{background:var(--gold);color:#1a1a1a;opacity:1;box-shadow:inset 0 0 0 2px #fff}
-.range-cell.in-range.rec-mix{background:linear-gradient(135deg,var(--blue) 50%,var(--green) 50%);color:#fff;opacity:.8}
-.range-cell.in-range.rec-mix.current{box-shadow:inset 0 0 0 2px #fff}
+.range-cell.in-range{color:#1a1a1a;font-weight:700}
+.range-cell.in-range.type-raise{background:var(--green)}
+.range-cell.in-range.type-call{background:var(--blue);color:#fff}
+.range-cell.in-range.type-mix{background:linear-gradient(135deg,var(--blue) 40%,var(--green) 60%);color:#fff}
+.range-cell.in-range.current{box-shadow:inset 0 0 0 2px #fff}
 .range-cell.not-in-range{background:#1a1a1a;color:#444}
+.range-cell.not-in-range .cell-label{display:none}
 .range-cell .cell-label{font-size:7px;line-height:1;white-space:nowrap}
 .range-cell.not-in-range .cell-label{display:none}
 
@@ -244,6 +242,7 @@ body{
         <div class="range-legend-item"><div class="swatch blue"></div> 跟注</div>
         <div class="range-legend-item"><div class="swatch mix"></div> 混合</div>
         <div class="range-legend-item"><div class="swatch gold"></div> 当前手牌</div>
+        <div class="range-legend-item" style="margin-left:6px;color:#999">颜色深浅=频率</div>
       </div>
     </div>
   </div>
@@ -337,6 +336,47 @@ function expandRangeStr(str){
   }
   return [...new Set(result)];
 }
+// Convert range array to frequency map: handKey -> freq (0-1)
+function rangeToFreq(arr){
+  if(!arr||arr.length===0) return {};
+  let map={};
+  for(let a of arr){ let h=parseHand(a.toUpperCase()); if(h) map[handToStr(h).toLowerCase()]=1.0; }
+  return freqSmooth(map);
+}
+
+// Smooth frequencies: strongest hands 100%, edges taper off
+function freqSmooth(map){
+  let keys=Object.keys(map);
+  if(keys.length===0) return map;
+  let strengths=keys.map(k=>{
+    let h=parseHand(k.toUpperCase());if(!h)return 0;
+    let i1=RANK_IDX[h.r1],i2=RANK_IDX[h.r2];
+    let high=Math.max(i1,i2),low=Math.min(i1,i2);
+    if(h.r1===h.r2) return 100-high; // pairs: AA=100, 22=88
+    let gap=high-low;
+    let base=(14-high)*6+(h.suited?8:0)+(gap<=2?5:gap<=3?2:0);
+    // A-high bonus
+    if(high===0) base+=10;
+    if(low<=1) base+=3;
+    return base;
+  });
+  let maxS=Math.max(...strengths),minS=Math.min(...strengths);
+  let range=maxS-minS||1;
+  let result={};
+  for(let i=0;i<keys.length;i++){
+    let norm=(strengths[i]-minS)/range; // 0=weakest,1=strongest
+    // Map to frequency: strong=100%, mid=60-90%, edge=25-50%
+    let freq;
+    if(norm>=0.85) freq=1.0;
+    else if(norm>=0.6) freq=0.65+norm*0.4; // 0.65-0.95
+    else if(norm>=0.35) freq=0.3+norm*0.9; // 0.4-0.6
+    else freq=0.15+norm*0.6; // 0.15-0.35
+    result[keys[i]]=Math.max(0.1,Math.min(1.0,freq));
+  }
+  return result;
+}
+
+// Fallback: convert freq map to Set for backward compat
 function rangeToSet(arr){let s=new Set();for(let a of arr) s.add(a.toLowerCase());return s;}
 
 // ==== GTO 范围数据（由 TexasSolver 解算器自动生成）====
@@ -396,7 +436,7 @@ if (RFI_RANGES.UTG === undefined) {
 }
 
 // ---- 范围渲染 ----
-function renderRangeGrid(containerId, titleId, title, callSet, raiseSet, currentHandStr){
+function renderRangeGrid(containerId, titleId, title, callFreq, raiseFreq, currentHandStr){
   let grid=document.getElementById(containerId);
   let titleEl=document.getElementById(titleId);
   if(!grid) return;
@@ -410,14 +450,35 @@ function renderRangeGrid(containerId, titleId, title, callSet, raiseSet, current
       else if(i<j) key=RANKS[i].toLowerCase()+RANKS[j].toLowerCase()+'s';
       else key=RANKS[j].toLowerCase()+RANKS[i].toLowerCase()+'o';
       let label=key.replace(/[so]$/,'');
-      let inCall=callSet&&callSet.has(key);
-      let inRaise=raiseSet&&raiseSet.has(key);
+      let callF=callFreq&&callFreq[key]||0;
+      let raiseF=raiseFreq&&raiseFreq[key]||0;
       let isCurrent=currentHandStr&&key===currentHandStr;
-      cell.className='range-cell not-in-range';
-      if(inCall&&inRaise) cell.className='range-cell in-range rec-mix';
-      else if(inRaise) cell.className='range-cell in-range rec-raise';
-      else if(inCall) cell.className='range-cell in-range rec-call';
-      if(isCurrent) cell.className+=' current';
+      cell.className='range-cell';
+      if(raiseF>0||callF>0){
+        cell.classList.add('in-range');
+        if(raiseF>=callF){
+          cell.classList.add('type-raise');
+          cell.style.background=`rgba(0,200,83,${raiseF.toFixed(2)})`;
+          cell.style.color='#1a1a1a';
+        } else {
+          cell.classList.add('type-call');
+          cell.style.background=`rgba(41,121,255,${callF.toFixed(2)})`;
+          cell.style.color='#fff';
+        }
+        if(raiseF>0.1&&callF>0.1){
+          cell.classList.remove('type-raise','type-call');
+          cell.classList.add('type-mix');
+          let total=raiseF+callF;
+          let rp=raiseF/total;
+          cell.style.background=`linear-gradient(135deg,rgba(41,121,255,${callF.toFixed(2)}) 0%,rgba(41,121,255,${callF.toFixed(2)}) ${(1-rp)*100}%,rgba(0,200,83,${raiseF.toFixed(2)}) ${(1-rp)*100}%,rgba(0,200,83,${raiseF.toFixed(2)}) 100%)`;
+          cell.style.color='#fff';
+        }
+      } else {
+        cell.classList.add('not-in-range');
+      }
+      if(isCurrent){
+        cell.classList.add('current');
+      }
       cell.innerHTML=`<span class="cell-label">${label}</span>`;
       grid.appendChild(cell);
     }
@@ -724,11 +785,13 @@ function evaluateAction(sc, act){
 
   if(sc.type==='rfi'){
     let rfiS=rangeToSet(RFI_RANGES[sc.pos]);
+    let rfiF=rangeToFreq(RFI_RANGES[sc.pos]);
     let isIn=rfiS.has(hs);
+    let isFreq=rfiF[hs]||0;
 
     if(act.action==='raise'){
-      if(isIn){
-        result.correct=true; result.score=90;
+      if(isFreq>=0.5){
+        result.score=Math.round(60+isFreq*40); result.correct=isFreq>=0.5;
         result.message='✓ 加注入池 - GTO推荐行动';
         result.detail=`你的 ${hs} 在 <strong>${sc.pos}</strong> 的 GTO 加注范围内。<br><br>`;
         result.detail+=`<strong>为什么这是+EV：</strong><br>`;
@@ -741,8 +804,8 @@ function evaluateAction(sc, act){
         result.detail+=`• 弃牌EV=0，加注EV为正数 → 行动价值 > 0<br><br>`;
         result.detail+=posRangeNote(sc.pos);
       } else {
-        result.correct=false; result.score=20;
-        result.message='✗ 不应加注 - 不在GTO范围';
+        result.score=Math.round(5+isFreq*30); result.correct=false;
+        result.message=isFreq>0?'⚠ 加注频率偏低':'✗ 不应加注 - 不在GTO范围';
         result.detail=`你的 ${hs} 不在 <strong>${sc.pos}</strong> 的 GTO 加注范围内。<br><br>`;
         result.detail+=`<strong>为什么这是-EV：</strong><br>`;
         result.detail+=`• ${sc.pos} 的标准加注范围约 ${RFI_PCT[sc.pos]}%<br>`;
@@ -757,16 +820,16 @@ function evaluateAction(sc, act){
       }
     } else {
       if(isIn){
-        result.correct=false; result.score=30;
-        result.message='✗ 弃牌太紧 - 应加注入池';
+        result.score=Math.round(isFreq*50+10); result.correct=false;
+        result.message=isFreq>=0.8?'✗ 弃牌太紧 - 应加注入池':'⚠ 弃牌偏紧 - 该手牌有部分加注频率';
         result.detail=`你的 ${hs} 在 <strong>${sc.pos}</strong> 的 GTO 加注范围内。<br><br>`;
         result.detail+=`<strong>为什么弃牌是-EV：</strong><br>`;
         result.detail+=`• 这手牌对抗盲注的随机牌有约 <strong>${equity}%</strong> 的权益优势<br>`;
         result.detail+=`• 弃牌EV=0，但加注有正EV，每次弃牌相当于损失价值的期望值<br>`;
         result.detail+=`• 弃牌太频繁会被激进玩家剥削（你弃牌太多他们会更频繁地偷盲）<br>`;
       } else {
-        result.correct=true; result.score=95;
-        result.message='✓ 弃牌 - GTO推荐行动';
+        result.score=Math.round(60+(1-isFreq)*40); result.correct=true;
+        result.message=isFreq<0.3?'✓ 弃牌 - GTO推荐行动':'⚠ 可考虑混合策略';
         result.detail=`你的 ${hs} 不在 <strong>${sc.pos}</strong> 的 GTO 加注范围内。<br><br>`;
         result.detail+=`<strong>为什么弃牌是+EV：</strong><br>`;
         result.detail+=`• 从该位置用这手牌加注的EV为负<br>`;
@@ -774,22 +837,24 @@ function evaluateAction(sc, act){
         result.detail+=`• 保留筹码等待更好的机会（选择性激进）<br>`;
       }
     }
-    result.raiseSet=rfiS;
+    result.raiseFreq=rfiF;
     result.title=`${sc.pos} GTO 加注范围 (${RFI_RANGES[sc.pos].length}种组合, ${RFI_PCT[sc.pos]}%)`;
 
   } else if(sc.type==='facing_raise'){
     let vs=VS_RAISE[sc.pos]?.[sc.raiser];
     if(!vs) return result;
     let cS=rangeToSet(vs.call), rS=rangeToSet(vs.raise);
+    let cF=rangeToFreq(vs.call), rF=rangeToFreq(vs.raise);
     let shCall=cS.has(hs), shRaise=rS.has(hs);
+    let callFreq=cF[hs]||0, raiseFreq=rF[hs]||0;
     let callAmt=sc.size||2.5;
     let potBefore=1.5+callAmt;
     let po=potOdds(callAmt,potBefore);
     let reqEq=po/realizationFactor(sc.pos,sc.raiser);
 
     if(act.action==='fold'){
-      if(shCall||shRaise){
-        result.correct=false; result.score=15;
+      if(callFreq>0.3||raiseFreq>0.3){
+        result.score=Math.round(Math.max(callFreq,raiseFreq)*40+5); result.correct=false;
         result.message='✗ 弃牌过紧 - 应防守';
         result.detail=`面对 ${sc.raiser} 的 ${callAmt}bb 加注，你的 ${hs} 在 GTO 防守范围内。<br><br>`;
         result.detail+=`<strong>为什么弃牌是-EV：</strong><br>`;
@@ -799,8 +864,8 @@ function evaluateAction(sc, act){
         if(sc.pos==='BTN'||sc.pos==='CO') result.detail+=`• 你有位置优势，翻后可更好实现权益<br>`;
         result.detail+=`• 面对 ${sc.raiser} 的范围，你的手牌有足够的可玩性`;
       } else {
-        result.correct=true; result.score=90;
-        result.message='✓ 弃牌 - GTO推荐';
+        result.score=Math.round(70+(1-Math.max(callFreq,raiseFreq))*30); result.correct=true;
+        result.message=Math.max(callFreq,raiseFreq)<0.15?'✓ 弃牌 - GTO推荐':'⚠ 有一定防守频率';
         result.detail=`面对 ${sc.raiser} 的加注，你的 ${hs} 不在 GTO 防守范围内。<br><br>`;
         result.detail+=`<strong>为什么弃牌是+EV：</strong><br>`;
         result.detail+=`• 你的权益约 ${equity}%，需要约 ${reqEq.toFixed(1)}%才能保本<br>`;
@@ -809,8 +874,8 @@ function evaluateAction(sc, act){
         result.detail+=`• 在 ${sc.pos} 面对 ${sc.raiser} 的加注，防守标准偏紧是正确的`;
       }
     } else if(act.action==='call'){
-      if(shCall){
-        result.correct=true; result.score=85;
+      if(callFreq>=0.5){
+        result.score=Math.round(callFreq*40+50); result.correct=true;
         result.message='✓ 跟注 - GTO推荐行动';
         result.detail=`你的 ${hs} 在 GTO 跟注范围内。<br><br>`;
         result.detail+=`<strong>为什么跟注是+EV：</strong><br>`;
@@ -821,8 +886,8 @@ function evaluateAction(sc, act){
         if(sc.hand.r1===sc.hand.r2) extra+='• 对子可中暗三条，隐含赔率高<br>';
         if(sc.pos==='BTN'||sc.pos==='CO') extra+=`• 在 ${sc.pos} 有位置优势，可最大化权益实现<br>`;
         result.detail+=extra;
-      } else if(shRaise){
-        result.correct=false; result.score=45;
+      } else if(raiseFreq>=callFreq&&raiseFreq>0.3){
+        result.score=Math.round(raiseFreq*30+20); result.correct=false;
         result.message='✗ 应3bet而非跟注';
         result.detail=`你的 ${hs} 在 GTO 策略中更倾向于 3bet。<br><br>`;
         result.detail+=`<strong>为什么3bet优于跟注：</strong><br>`;
@@ -839,7 +904,7 @@ function evaluateAction(sc, act){
         result.detail+=`• 弃牌或（在合适位置时）3bet诈唬是更好的选择`;
       }
     } else if(act.action==='raise'){
-      if(shRaise){
+      if(raiseFreq>=0.5){
         let ok=act.size>=sc.sizeMin&&act.size<=sc.sizeMax;
         if(ok){
           result.correct=true; result.score=90;
@@ -855,8 +920,8 @@ function evaluateAction(sc, act){
           result.message='⚠ 3bet方向正确但尺度需调整';
           result.detail=`GTO推荐 3bet 尺度为 ${sc.sizeMin}-${sc.sizeMax}bb。<br>你的 ${act.size}bb ${act.size<sc.sizeMin?'偏小，让对手用宽范围跟注':'偏大，风险回报比不合理'}。`;
         }
-      } else if(shCall){
-        result.correct=false; result.score=40;
+      } else if(callFreq>=0.5){
+        result.score=Math.round(callFreq*30+15); result.correct=false;
         result.message='✗ 应跟注而非3bet';
         result.detail=`这手牌更适合跟注。<br><br>`;
         result.detail+=`<strong>为什么跟注优于3bet：</strong><br>`;
@@ -869,21 +934,23 @@ function evaluateAction(sc, act){
         result.detail=`这手牌太弱不宜 3bet。<br>弃牌是更好的选择。`;
       }
     }
-    result.callSet=cS; result.raiseSet=rS;
+    result.callFreq=cF; result.raiseFreq=rF;
     result.title=`${sc.pos} vs ${sc.raiser} GTO防守范围`;
 
   } else if(sc.type==='facing_3bet'){
     let vs3=VS_3BET[sc.pos]?.[sc.raiser];
     if(!vs3) return result;
     let cS=rangeToSet(vs3.call), rS=rangeToSet(vs3.raise);
+    let cF=rangeToFreq(vs3.call), rF=rangeToFreq(vs3.raise);
     let shCall=cS.has(hs), shRaise=rS.has(hs);
+    let callFreq=cF[hs]||0, raiseFreq=rF[hs]||0;
     let callAmt=sc.threeSize-sc.size;
     let potBefore=1.5+sc.size+sc.threeSize;
     let po=potOdds(callAmt,potBefore);
 
     if(act.action==='fold'){
-      if(shCall||shRaise){
-        result.correct=false; result.score=15;
+      if(callFreq>0.3||raiseFreq>0.3){
+        result.score=Math.round(Math.max(callFreq,raiseFreq)*40+5); result.correct=false;
         result.message='✗ 弃牌过紧 - 应防守3bet';
         result.detail=`面对 ${sc.raiser} 的 3bet，你的 ${hs} 在 GTO 防守范围内。<br><br>`;
         result.detail+=`<strong>为什么弃牌是-EV：</strong><br>`;
@@ -891,8 +958,8 @@ function evaluateAction(sc, act){
         result.detail+=`• 你的手牌有足够的可玩性跟注或4bet<br>`;
         result.detail+=`• 弃牌太频繁会被激进玩家用宽范围3bet剥削`;
       } else {
-        result.correct=true; result.score=90;
-        result.message='✓ 弃牌 - GTO推荐';
+        result.score=Math.round(70+(1-Math.max(callFreq,raiseFreq))*30); result.correct=true;
+        result.message=Math.max(callFreq,raiseFreq)<0.15?'✓ 弃牌 - GTO推荐':'⚠ 该手牌有部分防守频率';
         result.detail=`你的 ${hs} 不适合防守这个 3bet。<br><br>`;
         result.detail+=`<strong>为什么弃牌是+EV：</strong><br>`;
         result.detail+=`• 你的手牌对抗3bet范围的权益不足<br>`;
@@ -900,16 +967,16 @@ function evaluateAction(sc, act){
         result.detail+=`• 4bet会迫使更弱的牌弃牌而更强的牌跟注，风险回报比差`;
       }
     } else if(act.action==='call'){
-      if(shCall){
-        result.correct=true; result.score=85;
+      if(callFreq>=0.5){
+        result.score=Math.round(callFreq*40+50); result.correct=true;
         result.message='✓ 跟注 - GTO推荐';
         result.detail=`你的 ${hs} 适合跟注 3bet。<br><br>`;
         result.detail+=`<strong>为什么跟注是+EV：</strong><br>`;
         result.detail+=`• 底池赔率 = ${po.toFixed(1)}%<br>`;
         result.detail+=`• 你的手牌有足够的可玩性（如中暗、听牌潜力）<br>`;
         result.detail+=`• 跟注保留了翻后操作空间，可最大化手牌价值`;
-      } else if(shRaise){
-        result.correct=false; result.score=40;
+      } else if(raiseFreq>=callFreq&&raiseFreq>0.3){
+        result.score=Math.round(raiseFreq*30+20); result.correct=false;
         result.message='✗ 应4bet而非跟注';
         result.detail=`这手牌在 GTO 策略中应 4bet。<br>平跟会错失价值且容易被 5bet 诈唬剥削。`;
       } else {
@@ -918,7 +985,7 @@ function evaluateAction(sc, act){
         result.detail=`手牌太弱不适合跟注 3bet。`;
       }
     } else if(act.action==='raise'){
-      if(shRaise){
+      if(raiseFreq>=0.5){
         let ok=act.size>=sc.sizeMin&&act.size<=sc.sizeMax;
         if(ok){
           result.correct=true; result.score=90;
@@ -934,8 +1001,8 @@ function evaluateAction(sc, act){
           result.message='⚠ 4bet方向正确但尺度需调整';
           result.detail=`GTO推荐 4bet 尺度为 ${sc.sizeMin}-${sc.sizeMax}bb。`;
         }
-      } else if(shCall){
-        result.correct=false; result.score=40;
+      } else if(callFreq>=0.5){
+        result.score=Math.round(callFreq*30+15); result.correct=false;
         result.message='✗ 应跟注而非4bet';
         result.detail=`这手牌更适合跟注 3bet。`;
       } else {
@@ -944,7 +1011,7 @@ function evaluateAction(sc, act){
         result.detail=`手牌太弱不宜 4bet。`;
       }
     }
-    result.callSet=cS; result.raiseSet=rS;
+    result.callFreq=cF; result.raiseFreq=rF;
     result.title=`${sc.pos} vs 3bet GTO防守范围 (来自${sc.raiser})`;
   }
 
@@ -1111,7 +1178,7 @@ function showResult(result, sc){
 
   let gw=document.getElementById('rangeGridWrap');
   gw.style.display='block';
-  renderRangeGrid('rangeGrid','rangeGridTitle',result.title,result.callSet,result.raiseSet,handToStr(sc.hand).toLowerCase());
+  renderRangeGrid('rangeGrid','rangeGridTitle',result.title,result.callFreq||{},result.raiseFreq||{},handToStr(sc.hand).toLowerCase());
 }
 
 // ---- 事件绑定 ----
