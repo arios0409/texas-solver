@@ -281,13 +281,59 @@ function handToDisplay(h){
 }
 function handEq(a,b){return a.r1===b.r1&&a.r2===b.r2&&a.suited===b.suited}
 
-// ---- 范围解析器: "77+, ATs+, AQo+" ----
+// ---- 范围解析器: "77+, ATs+, AQo+" 以及 "TT-77, AJs-ATs" ----
 function expandRangeStr(str){
   if(!str||!str.trim()) return [];
   let parts=str.split(',').map(s=>s.trim()).filter(Boolean);
   let result=[];
   for(let p of parts){
-    if(p.includes('+')){let base=p.replace('+','').trim();let h=parseHand(base);if(!h) continue;let i1=RANK_IDX[h.r1],i2=RANK_IDX[h.r2];if(h.r1===h.r2){for(let i=i1;i>=0;i--) result.push(RANKS[i]+RANKS[i]);}else if(h.suited){for(let i=i2;i>0;i--){if(i>=i1) continue;result.push(RANKS[i1]+RANKS[i]+'s');}}else{for(let i=i2;i>0;i--){if(i>=i1) continue;result.push(RANKS[i1]+RANKS[i]+'o');}}}else{let h=parseHand(p);if(h) result.push(handToStr(h));}
+    // 处理范围语法: "TT-77", "AJs-ATs", "AQo-A9o"
+    if(p.includes('-')){
+      let dashIdx=p.indexOf('-');
+      let hi=p.substring(0,dashIdx).trim(), lo=p.substring(dashIdx+1).trim();
+      let hHi=parseHand(hi), hLo=parseHand(lo);
+      if(!hHi||!hLo) continue;
+      // 判断是同类型范围
+      if(hHi.r1===hLo.r1 && hHi.r1!==hHi.r2 && hHi.suited===hLo.suited){
+        // 如 AJs-ATs: 相同踢脚范围, AJs, ATs
+        let ki=RANK_IDX[hHi.r1], loIdx=RANK_IDX[hHi.r2], hiIdx=RANK_IDX[hLo.r2];
+        let s=hHi.suited?'s':'o';
+        for(let i=Math.min(loIdx,hiIdx);i<=Math.max(loIdx,hiIdx);i++){
+          if(i===ki) continue;
+          result.push(RANKS[ki]+RANKS[i]+s);
+        }
+      } else if(hHi.r1===hHi.r2 && hLo.r1===hLo.r2){
+        // 对子范围: TT-77
+        let hiI=RANK_IDX[hHi.r1], loI=RANK_IDX[hLo.r1];
+        for(let i=Math.min(hiI,loI);i<=Math.max(hiI,loI);i++){
+          result.push(RANKS[i]+RANKS[i]);
+        }
+      } else {
+        // fallback: 单个解析
+        if(hHi) result.push(handToStr(hHi));
+        if(hLo) result.push(handToStr(hLo));
+      }
+    }
+    // 处理 + 语法: "JJ+", "ATs+", "AQo+"
+    else if(p.includes('+')){
+      let base=p.replace('+','').trim();
+      let h=parseHand(base);if(!h) continue;
+      let i1=RANK_IDX[h.r1],i2=RANK_IDX[h.r2];
+      if(h.r1===h.r2){
+        // 对子+: JJ+ → JJ, QQ, KK, AA
+        for(let i=i1;i>=0;i--) result.push(RANKS[i]+RANKS[i]);
+      }else if(h.suited){
+        // 同花+: ATs+ → ATs, AJs, AQs, AKs
+        for(let i=i2;i>0;i--){if(i>=i1) continue;result.push(RANKS[i1]+RANKS[i]+'s');}
+      }else{
+        // 非同花+: AQo+ → AQo, AKo
+        for(let i=i2;i>0;i--){if(i>=i1) continue;result.push(RANKS[i1]+RANKS[i]+'o');}
+      }
+    }
+    // 单张: "KQs", "A5s"
+    else{
+      let h=parseHand(p);if(h) result.push(handToStr(h));
+    }
   }
   return [...new Set(result)];
 }
