@@ -1,5 +1,11 @@
 node_modules/
 build/
 *.apk
+*.ipa
 *.keystore
+*.mobileprovision
 .DS_Store
+ios/PokerTrainer/index.html
+ios/PokerTrainer/ranges_data.js
+ios/PokerTrainer/sw.js
+ios/PokerTrainer/manifest.json

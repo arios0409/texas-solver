@@ -1,0 +1,159 @@
+name: 编译 IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 选择 Xcode 版本
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_15.2.app 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_15.0.app 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+
+      - name: 复制网页到 iOS 源目录并更新项目
+        run: |
+          # 复制 web 文件到 iOS 源目录
+          cp index.html ios/PokerTrainer/
+          cp ranges_data.js ios/PokerTrainer/ 2>/dev/null || true
+
+          # 用 Python 脚本动态把新文件加入 pbxproj
+          python3 << 'PYEOF'
+          import uuid, re, os
+
+          proj_path = "ios/PokerTrainer.xcodeproj/project.pbxproj"
+          with open(proj_path, "r") as f:
+              content = f.read()
+
+          # 找 ResourcesBuildPhase 的 UUID
+          res_match = re.search(r'(PBXResourcesBuildPhase.*?isa = PBXResourcesBuildPhase;.*?files = \()', content, re.DOTALL)
+          if not res_match:
+              print("ERROR: 找不到 ResourcesBuildPhase")
+              exit(1)
+
+          # 找到 files = ( 之后的位置，插入我们的文件
+          insert_pos = res_match.end()
+
+          files_to_add = ["index.html", "ranges_data.js"]
+          new_refs = []
+          for fname in files_to_add:
+              fpath = f"ios/PokerTrainer/{fname}"
+              if not os.path.exists(fpath):
+                  continue
+
+              # 生成 UUID
+              file_ref = uuid.uuid4().hex[:24].upper()
+              build_ref = uuid.uuid4().hex[:24].upper()
+
+              # 判断文件类型
+              if fname.endswith(".html"):
+                  ftype = "text.html"
+              elif fname.endswith(".js"):
+                  ftype = "sourcecode.javascript"
+              else:
+                  ftype = "text"
+
+              # PBXFileReference
+              file_ref_line = f'        {file_ref} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = {ftype}; path = {fname}; sourceTree = "<group>"; }};\n'
+
+              # PBXBuildFile
+              build_ref_line = f'        {build_ref} /* {fname} in Resources */ = {{isa = PBXBuildFile; fileRef = {file_ref} /* {fname} */; }};\n'
+
+              # 插入到 PBXFileReference section 末尾
+              content = content.replace(
+                  "/* End PBXFileReference section */",
+                  file_ref_line + "/* End PBXFileReference section */"
+              )
+
+              # 插入到 PBXBuildFile section 末尾
+              content = content.replace(
+                  "/* End PBXBuildFile section */",
+                  build_ref_line + "/* End PBXBuildFile section */"
+              )
+
+              # 添加到 files = ( 列表
+              content = content[:insert_pos] + f"\n                {build_ref} /* {fname} in Resources */," + content[insert_pos:]
+              insert_pos += len(f"\n                {build_ref} /* {fname} in Resources */,")
+
+              # 添加到 mainGroup children
+              content = content.replace(
+                  "/* End PBXGroup section */",
+                  f"                {file_ref} /* {fname} */,\n/* End PBXGroup section */"
+              )
+
+              new_refs.append(fname)
+
+          with open(proj_path, "w") as f:
+              f.write(content)
+
+          print(f"已添加文件到项目: {', '.join(new_refs)}")
+          PYEOF
+
+      - name: 构建 Archive
+        run: |
+          cd ios
+          xcodebuild archive \
+            -project PokerTrainer.xcodeproj \
+            -scheme PokerTrainer \
+            -configuration Release \
+            -archivePath "$GITHUB_WORKSPACE/build/PokerTrainer.xcarchive" \
+            -destination "generic/platform=iOS" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: 导出 IPA
+        run: |
+          cat > "$GITHUB_WORKSPACE/build/ExportOptions.plist" << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>debug</string>
+              <key>compileBitcode</key>
+              <false/>
+              <key>destination</key>
+              <string>export</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>thinning</key>
+              <string>&lt;none&gt;</string>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath "$GITHUB_WORKSPACE/build/PokerTrainer.xcarchive" \
+            -exportPath "$GITHUB_WORKSPACE/build/output" \
+            -exportOptionsPlist "$GITHUB_WORKSPACE/build/ExportOptions.plist" \
+            -allowProvisioningUpdates
+
+      - name: 重命名 IPA
+        run: |
+          mv "$GITHUB_WORKSPACE/build/output/PokerTrainer.ipa" \
+             "$GITHUB_WORKSPACE/build/翻前训练器yifan-v1.0.ipa"
+
+      - name: 上传 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: 翻前训练器yifan-IPA
+          path: build/翻前训练器yifan-v1.0.ipa
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: build/翻前训练器yifan-v*.ipa
